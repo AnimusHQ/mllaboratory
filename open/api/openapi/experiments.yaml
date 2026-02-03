@@ -2233,6 +2233,421 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список EnvironmentDefinition
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать EnvironmentDefinition
+      description: |
+        Создаёт новую версию окружения в рамках проекта.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить EnvironmentDefinition
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinition"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:update:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Создать новую версию EnvironmentDefinition
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:archive:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Архивировать EnvironmentDefinition (новая версия)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-locks:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список EnvironmentLock
+      parameters:
+        - name: environment_definition_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLockListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать EnvironmentLock
+      description: |
+        Формирует неизменяемую фиксацию окружения по EnvironmentDefinition.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentLockCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLockResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-locks/{lock_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: lock_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить EnvironmentLock
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLock"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
 components:
   schemas:
@@ -3345,7 +3760,7 @@ components:
         codeRef:
           $ref: "#/components/schemas/CodeRef"
         envLock:
-          $ref: "#/components/schemas/EnvironmentLock"
+          $ref: "#/components/schemas/EnvironmentLockRef"
         parameters:
           type: object
           additionalProperties: true
@@ -3554,16 +3969,176 @@ components:
           type: string
         scmType:
           type: string
-    EnvironmentLock:
+    EnvironmentLockRef:
       type: object
       additionalProperties: false
-      required: [envHash, imageDigests]
+      required: [lockId]
       properties:
         lockId:
           type: string
-        envHash:
+    EnvironmentBaseImage:
+      type: object
+      additionalProperties: false
+      required: [name, ref]
+      properties:
+        name:
           type: string
-        envTemplateId:
+        ref:
+          type: string
+    EnvironmentResources:
+      type: object
+      additionalProperties: false
+      properties:
+        cpu:
+          type: string
+        memory:
+          type: string
+        gpu:
+          type: integer
+    EnvironmentImage:
+      type: object
+      additionalProperties: false
+      required: [name, ref, digest]
+      properties:
+        name:
+          type: string
+        ref:
+          type: string
+        digest:
+          type: string
+    EnvironmentDefinition:
+      type: object
+      additionalProperties: false
+      required: [environmentDefinitionId, projectId, name, version, baseImages, status, createdAt]
+      properties:
+        environmentDefinitionId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        version:
+          type: integer
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        status:
+          type: string
+        supersedesDefinitionId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    EnvironmentDefinitionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, baseImages]
+      properties:
+        idempotencyKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    EnvironmentDefinitionUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        idempotencyKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    EnvironmentDefinitionResponse:
+      type: object
+      additionalProperties: false
+      required: [definition, created]
+      properties:
+        definition:
+          $ref: "#/components/schemas/EnvironmentDefinition"
+        created:
+          type: boolean
+    EnvironmentDefinitionListResponse:
+      type: object
+      additionalProperties: false
+      required: [definitions]
+      properties:
+        definitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentDefinition"
+    EnvironmentLockCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [environmentDefinitionId, imageDigests]
+      properties:
+        idempotencyKey:
+          type: string
+        environmentDefinitionId:
           type: string
         imageDigests:
           type: object
@@ -3574,6 +4149,68 @@ components:
           additionalProperties:
             type: string
         sbomRef:
+          type: string
+    EnvironmentLockResponse:
+      type: object
+      additionalProperties: false
+      required: [lock, created]
+      properties:
+        lock:
+          $ref: "#/components/schemas/EnvironmentLock"
+        created:
+          type: boolean
+    EnvironmentLockListResponse:
+      type: object
+      additionalProperties: false
+      required: [locks]
+      properties:
+        locks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentLock"
+    EnvironmentLock:
+      type: object
+      additionalProperties: false
+      required: [lockId, environmentDefinitionId, environmentDefinitionVersion, images, envHash]
+      properties:
+        lockId:
+          type: string
+        projectId:
+          type: string
+        environmentDefinitionId:
+          type: string
+        environmentDefinitionVersion:
+          type: integer
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        dependencyChecksums:
+          type: object
+          additionalProperties:
+            type: string
+        sbomRef:
+          type: string
+        envHash:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
           type: string
     PolicySnapshot:
       type: object
@@ -3593,6 +4230,8 @@ components:
           $ref: "#/components/schemas/PolicySnapshotRetention"
         network:
           $ref: "#/components/schemas/PolicySnapshotNetwork"
+        secrets:
+          $ref: "#/components/schemas/PolicySnapshotSecrets"
         templates:
           $ref: "#/components/schemas/PolicySnapshotTemplates"
         policies:
@@ -3613,6 +4252,8 @@ components:
           items:
             type: string
         projectId:
+          type: string
+        decision:
           type: string
     PolicySnapshotRetention:
       type: object
@@ -3644,6 +4285,17 @@ components:
           type: array
           items:
             type: string
+        classRef:
+          type: string
+    PolicySnapshotSecrets:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+        classRef:
+          type: string
     PolicySnapshotTemplates:
       type: object
       additionalProperties: false

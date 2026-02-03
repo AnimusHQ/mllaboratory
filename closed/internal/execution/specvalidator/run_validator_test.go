@@ -60,7 +60,16 @@ func TestValidateRunSpec(t *testing.T) {
 			name: "missing image digests",
 			spec: func() domain.RunSpec {
 				rs := minimalRunSpec(pipelineWithDatasetRef("training"))
-				rs.EnvLock.ImageDigests = nil
+				rs.EnvLock.Images = nil
+				return rs
+			}(),
+			wantErr: true,
+		},
+		{
+			name: "missing lock id",
+			spec: func() domain.RunSpec {
+				rs := minimalRunSpec(pipelineWithDatasetRef("training"))
+				rs.EnvLock.LockID = ""
 				return rs
 			}(),
 			wantErr: true,
@@ -114,8 +123,17 @@ func minimalRunSpec(pipeline domain.PipelineSpec) domain.RunSpec {
 			CommitSHA: "deadbeef",
 		},
 		EnvLock: domain.EnvLock{
-			EnvHash:      "envhash",
-			ImageDigests: map[string]string{"runtime": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},
+			LockID:                       "lock_123",
+			EnvironmentDefinitionID:      "envdef_123",
+			EnvironmentDefinitionVersion: 1,
+			Images: []domain.EnvironmentImage{
+				{
+					Name:   "runtime",
+					Ref:    "ghcr.io/acme/runtime:latest",
+					Digest: "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+				},
+			},
+			EnvHash: "envhash",
 		},
 		Parameters: domain.Metadata{
 			"lr": 0.1,

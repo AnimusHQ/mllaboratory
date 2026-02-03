@@ -18,6 +18,7 @@ const (
 )
 
 func TestBuildRunSpecValidationErrors(t *testing.T) {
+	envLock := minimalEnvLock()
 	tests := []struct {
 		name    string
 		req     createRunRequest
@@ -29,7 +30,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 				PipelineSpec:    rawSpec(minimalPipelineSpecJSON(validImageRef)),
 				DatasetBindings: map[string]string{},
 				CodeRef:         runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: ""},
-				EnvLock:         runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:         runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:      map[string]any{},
 			},
 			wantErr: errInvalidRunSpec,
@@ -40,7 +41,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 				PipelineSpec:    rawSpec(pipelineSpecWithDatasetRef(validImageRef, "training")),
 				DatasetBindings: map[string]string{},
 				CodeRef:         runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: "deadbeef"},
-				EnvLock:         runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:         runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:      map[string]any{},
 			},
 			wantErr: errInvalidRunSpec,
@@ -51,7 +52,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 				PipelineSpec:    rawSpec(minimalPipelineSpecJSON("ghcr.io/acme/train:latest")),
 				DatasetBindings: map[string]string{},
 				CodeRef:         runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: "deadbeef"},
-				EnvLock:         runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:         runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:      map[string]any{},
 			},
 			wantErr: errInvalidPipelineSpec,
@@ -62,7 +63,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 				PipelineSpec:    rawSpec(pipelineSpecWithDuplicateSteps(validImageRef)),
 				DatasetBindings: map[string]string{},
 				CodeRef:         runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: "deadbeef"},
-				EnvLock:         runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:         runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:      map[string]any{},
 			},
 			wantErr: errInvalidPipelineSpec,
@@ -73,7 +74,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 				PipelineSpec:    rawSpec(pipelineSpecWithCycle(validImageRef)),
 				DatasetBindings: map[string]string{},
 				CodeRef:         runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: "deadbeef"},
-				EnvLock:         runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:         runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:      map[string]any{},
 			},
 			wantErr: errInvalidPipelineSpec,
@@ -83,7 +84,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 			req: createRunRequest{
 				PipelineSpec: rawSpec(minimalPipelineSpecJSON(validImageRef)),
 				CodeRef:      runSpecCodeRef{RepoURL: "https://github.com/acme/repo", CommitSHA: "deadbeef"},
-				EnvLock:      runSpecEnvLock{EnvHash: "envhash", ImageDigests: map[string]string{"runtime": validDigest}},
+				EnvLock:      runSpecEnvLockRef{LockID: envLock.LockID},
 				Parameters:   map[string]any{},
 			},
 			wantErr: errDatasetBindingsNeeded,
@@ -91,7 +92,7 @@ func TestBuildRunSpecValidationErrors(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if _, _, err := buildRunSpec("proj-1", "actor", tc.req, minimalPolicySnapshot()); err != tc.wantErr {
+		if _, _, err := buildRunSpec("proj-1", "actor", tc.req, envLock, minimalPolicySnapshot()); err != tc.wantErr {
 			t.Fatalf("%s: expected err %v, got %v", tc.name, tc.wantErr, err)
 		}
 	}
@@ -106,9 +107,30 @@ func minimalPolicySnapshot() domain.PolicySnapshot {
 			Subject:   "actor",
 			Roles:     []string{"admin"},
 			ProjectID: "proj-1",
+			Decision:  "allow",
 		},
+		Retention:      domain.PolicySnapshotRetention{Mode: "not_configured"},
+		Network:        domain.PolicySnapshotNetwork{Mode: "not_configured"},
+		Secrets:        domain.PolicySnapshotSecrets{Mode: "not_configured"},
+		Templates:      domain.PolicySnapshotTemplates{Mode: "not_configured"},
 		Policies:       []domain.PolicySnapshotPolicy{},
 		SnapshotSHA256: "snapsha",
+	}
+}
+
+func minimalEnvLock() domain.EnvLock {
+	return domain.EnvLock{
+		LockID:                       "lock-1",
+		EnvironmentDefinitionID:      "envdef-1",
+		EnvironmentDefinitionVersion: 1,
+		Images: []domain.EnvironmentImage{
+			{
+				Name:   "runtime",
+				Ref:    "ghcr.io/acme/runtime:latest",
+				Digest: validDigest,
+			},
+		},
+		EnvHash: "envhash",
 	}
 }
 
@@ -204,7 +226,7 @@ func TestCreateRunRequiresIdempotencyKey(t *testing.T) {
   "pipelineSpec": {},
   "datasetBindings": {},
   "codeRef": {"repoUrl":"https://github.com/acme/repo","commitSha":"deadbeef"},
-  "envLock": {"envHash":"envhash","imageDigests":{"runtime":"sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+  "envLock": {"lockId":"lock-1"},
   "parameters": {}
 }`
 	req := httptest.NewRequest(http.MethodPost, "/projects/proj-1/runs", strings.NewReader(body))

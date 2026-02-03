@@ -16,7 +16,7 @@ import (
 
 const policySnapshotVersion = "1.0"
 
-func (api *experimentsAPI) buildPolicySnapshot(ctx context.Context, projectID string, identity auth.Identity) (domain.PolicySnapshot, error) {
+func (api *experimentsAPI) buildPolicySnapshot(ctx context.Context, projectID string, identity auth.Identity, envLock domain.EnvLock) (domain.PolicySnapshot, error) {
 	projectID = strings.TrimSpace(projectID)
 	if projectID == "" {
 		return domain.PolicySnapshot{}, errors.New("project id is required")
@@ -25,6 +25,18 @@ func (api *experimentsAPI) buildPolicySnapshot(ctx context.Context, projectID st
 	if err != nil {
 		return domain.PolicySnapshot{}, err
 	}
+	now := time.Now().UTC()
+	snapshot := assemblePolicySnapshot(projectID, identity, envLock, policies, now)
+
+	hash, err := hashPolicySnapshot(snapshot)
+	if err != nil {
+		return domain.PolicySnapshot{}, err
+	}
+	snapshot.SnapshotSHA256 = hash
+	return snapshot, nil
+}
+
+func assemblePolicySnapshot(projectID string, identity auth.Identity, envLock domain.EnvLock, policies []policyVersionRecord, now time.Time) domain.PolicySnapshot {
 	policySnapshots := make([]domain.PolicySnapshotPolicy, 0, len(policies))
 	for _, record := range policies {
 		policySnapshots = append(policySnapshots, domain.PolicySnapshotPolicy{
@@ -51,34 +63,45 @@ func (api *experimentsAPI) buildPolicySnapshot(ctx context.Context, projectID st
 	sortedRoles := append([]string{}, roles...)
 	sort.Strings(sortedRoles)
 
-	now := time.Now().UTC()
-	snapshot := domain.PolicySnapshot{
+	rbacDecision := "allow"
+	retention := domain.PolicySnapshotRetention{Mode: "not_configured"}
+	network := domain.PolicySnapshotNetwork{Mode: "not_configured"}
+	secrets := domain.PolicySnapshotSecrets{Mode: "not_configured"}
+	templates := domain.PolicySnapshotTemplates{Mode: "not_configured"}
+	if strings.TrimSpace(envLock.EnvironmentDefinitionID) != "" {
+		templates = domain.PolicySnapshotTemplates{
+			Mode:               "locked",
+			AllowedTemplateIDs: []string{strings.TrimSpace(envLock.EnvironmentDefinitionID)},
+		}
+	}
+	if strings.TrimSpace(envLock.NetworkClassRef) != "" {
+		network = domain.PolicySnapshotNetwork{
+			Mode:     "class_ref",
+			ClassRef: strings.TrimSpace(envLock.NetworkClassRef),
+		}
+	}
+	if strings.TrimSpace(envLock.SecretAccessClassRef) != "" {
+		secrets = domain.PolicySnapshotSecrets{
+			Mode:     "class_ref",
+			ClassRef: strings.TrimSpace(envLock.SecretAccessClassRef),
+		}
+	}
+	return domain.PolicySnapshot{
 		SnapshotVersion: policySnapshotVersion,
 		CapturedAt:      now,
 		CapturedBy:      strings.TrimSpace(identity.Subject),
 		RBAC: domain.PolicySnapshotRBAC{
 			Subject:   strings.TrimSpace(identity.Subject),
 			Roles:     sortedRoles,
-			ProjectID: projectID,
+			ProjectID: strings.TrimSpace(projectID),
+			Decision:  rbacDecision,
 		},
-		Retention: domain.PolicySnapshotRetention{
-			Mode: "not_configured",
-		},
-		Network: domain.PolicySnapshotNetwork{
-			Mode: "not_configured",
-		},
-		Templates: domain.PolicySnapshotTemplates{
-			Mode: "not_configured",
-		},
-		Policies: policySnapshots,
+		Retention: retention,
+		Network:   network,
+		Secrets:   secrets,
+		Templates: templates,
+		Policies:  policySnapshots,
 	}
-
-	hash, err := hashPolicySnapshot(snapshot)
-	if err != nil {
-		return domain.PolicySnapshot{}, err
-	}
-	snapshot.SnapshotSHA256 = hash
-	return snapshot, nil
 }
 
 type policySnapshotHashInput struct {
@@ -86,6 +109,7 @@ type policySnapshotHashInput struct {
 	RBAC            domain.PolicySnapshotRBAC      `json:"rbac"`
 	Retention       domain.PolicySnapshotRetention `json:"retention,omitempty"`
 	Network         domain.PolicySnapshotNetwork   `json:"network,omitempty"`
+	Secrets         domain.PolicySnapshotSecrets   `json:"secrets,omitempty"`
 	Templates       domain.PolicySnapshotTemplates `json:"templates,omitempty"`
 	Policies        []domain.PolicySnapshotPolicy  `json:"policies"`
 }
@@ -108,6 +132,7 @@ func hashPolicySnapshot(snapshot domain.PolicySnapshot) (string, error) {
 		RBAC:            rbac,
 		Retention:       snapshot.Retention,
 		Network:         snapshot.Network,
+		Secrets:         snapshot.Secrets,
 		Templates:       snapshot.Templates,
 		Policies:        policies,
 	}
@@ -152,25 +177,6 @@ func (api *experimentsAPI) ensureDatasetBindingsExist(ctx context.Context, proje
 		if ok != 1 {
 			return errDatasetVersionMissing
 		}
-	}
-	return nil
-}
-
-func (api *experimentsAPI) ensureEnvTemplateExists(ctx context.Context, projectID, envTemplateID string) error {
-	envTemplateID = strings.TrimSpace(envTemplateID)
-	if envTemplateID == "" {
-		return nil
-	}
-	store := postgres.NewRunBindingsStore(api.db)
-	if store == nil {
-		return errors.New("run bindings store not initialized")
-	}
-	exists, err := store.EnvironmentDefinitionExists(ctx, projectID, envTemplateID)
-	if err != nil {
-		return err
-	}
-	if !exists {
-		return errEnvTemplateMissing
 	}
 	return nil
 }

@@ -34,6 +34,15 @@ func ValidateRunSpec(spec domain.RunSpec) error {
 	if strings.TrimSpace(spec.EnvLock.EnvHash) == "" {
 		issues.Add("envLock.envHash is required")
 	}
+	if strings.TrimSpace(spec.EnvLock.LockID) == "" {
+		issues.Add("envLock.lockId is required")
+	}
+	if strings.TrimSpace(spec.EnvLock.EnvironmentDefinitionID) == "" {
+		issues.Add("envLock.environmentDefinitionId is required")
+	}
+	if spec.EnvLock.EnvironmentDefinitionVersion <= 0 {
+		issues.Add("envLock.environmentDefinitionVersion is required")
+	}
 	if spec.DatasetBindings == nil {
 		issues.Add("datasetBindings is required")
 	}
@@ -94,13 +103,35 @@ func ValidateRunSpec(spec domain.RunSpec) error {
 		}
 	}
 
-	if spec.EnvLock.ImageDigests == nil || len(spec.EnvLock.ImageDigests) == 0 {
-		issues.Add("envLock.imageDigests is required")
+	if len(spec.EnvLock.Images) == 0 {
+		issues.Add("envLock.images is required")
 	} else {
-		for key, value := range spec.EnvLock.ImageDigests {
-			if strings.TrimSpace(key) == "" || strings.TrimSpace(value) == "" {
-				issues.Add("envLock.imageDigests must not contain empty keys or values")
+		for _, image := range spec.EnvLock.Images {
+			if strings.TrimSpace(image.Name) == "" {
+				issues.Add("envLock.images[].name is required")
 			}
+			if strings.TrimSpace(image.Ref) == "" {
+				issues.Add("envLock.images[].ref is required")
+			}
+			digest := strings.TrimSpace(image.Digest)
+			if digest == "" {
+				issues.Add("envLock.images[].digest is required")
+			} else if !strings.HasPrefix(digest, "sha256:") {
+				issues.Add("envLock.images[].digest must be sha256")
+			}
+		}
+	}
+	if spec.EnvLock.ResourceDefaults.GPU < 0 || spec.EnvLock.ResourceLimits.GPU < 0 {
+		issues.Add("envLock resource GPU must be >= 0")
+	}
+	for _, accel := range spec.EnvLock.AllowedAccelerators {
+		accel = strings.ToLower(strings.TrimSpace(accel))
+		if accel == "" {
+			continue
+		}
+		if accel != "cpu" && accel != "gpu" {
+			issues.Add("envLock.allowedAccelerators contains unsupported value")
+			break
 		}
 	}
 

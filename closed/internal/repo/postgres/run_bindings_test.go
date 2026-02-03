@@ -27,7 +27,7 @@ func TestRunBindingsQueriesAreProjectScoped(t *testing.T) {
 		selectEnvDefinitionExistsQuery,
 	}
 	for _, query := range queries {
-		if !strings.Contains(query, "WHERE project_id = $1") {
+		if !strings.Contains(query, "project_id = $1") {
 			t.Fatalf("expected project scoping clause, got query: %s", query)
 		}
 	}

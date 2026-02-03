@@ -7,7 +7,7 @@
 - `open/api/openapi/gateway.yaml` — шлюз (auth, proxy в сервисы).
 - `open/api/openapi/dataset-registry.yaml` — Dataset и DatasetVersion.
 - `open/api/openapi/quality.yaml` — quality‑правила и оценки.
-- `open/api/openapi/experiments.yaml` — эксперименты, Run/Execution, политика, артефакты, evidence.
+- `open/api/openapi/experiments.yaml` — эксперименты, Run/Execution, PolicySnapshot, EnvironmentDefinition/Lock, политика, артефакты, evidence.
 - `open/api/openapi/lineage.yaml` — lineage‑события.
 - `open/api/openapi/audit.yaml` — аудит и экспорт.
 
@@ -47,6 +47,11 @@
 - EV006 ArtifactDownloaded
 - EV007 RoleBindingChanged
 - EV008 AuditExportDelivered
+- EV009 EnvironmentDefined
+- EV010 EnvironmentUpdated
+- EV011 EnvironmentArchived
+- EV012 EnvironmentLocked
+- EV013 PolicySnapshotMaterialized
 
 ### 3.2 Версионирование событий
 - События имеют стабильные идентификаторы EV###.

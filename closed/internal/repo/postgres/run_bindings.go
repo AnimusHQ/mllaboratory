@@ -29,18 +29,14 @@ const (
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
 		ON CONFLICT (run_id) DO NOTHING`
 	insertRunEnvLockQuery = `INSERT INTO run_environment_locks (
-			lock_id,
 			run_id,
 			project_id,
+			lock_id,
 			env_hash,
-			env_template_id,
-			image_digests,
-			dependency_checksums,
-			sbom_ref,
 			created_at,
 			created_by,
 			integrity_sha256
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7)
 		ON CONFLICT (run_id) DO NOTHING`
 	insertRunPolicySnapshotQuery = `INSERT INTO run_policy_snapshots (
 			snapshot_id,
@@ -56,9 +52,24 @@ const (
 	selectRunCodeRefQuery = `SELECT repo_url, commit_sha, path, scm_type
 		 FROM run_code_refs
 		 WHERE project_id = $1 AND run_id = $2`
-	selectRunEnvLockQuery = `SELECT lock_id, env_hash, env_template_id, image_digests, dependency_checksums, sbom_ref
-		 FROM run_environment_locks
-		 WHERE project_id = $1 AND run_id = $2`
+	selectRunEnvLockQuery = `SELECT l.lock_id,
+			l.environment_definition_id,
+			l.environment_definition_version,
+			l.images,
+			l.resource_defaults,
+			l.resource_limits,
+			l.allowed_accelerators,
+			l.network_class_ref,
+			l.secret_access_class_ref,
+			l.dependency_checksums,
+			l.sbom_ref,
+			l.env_hash,
+			l.created_at,
+			l.created_by,
+			l.integrity_sha256
+		FROM run_environment_locks r
+		JOIN environment_locks l ON l.lock_id = r.lock_id
+		WHERE r.project_id = $1 AND r.run_id = $2`
 	selectRunPolicySnapshotQuery = `SELECT snapshot
 		 FROM run_policy_snapshots
 		 WHERE project_id = $1 AND run_id = $2`
@@ -141,29 +152,20 @@ func (s *RunBindingsStore) InsertEnvLock(ctx context.Context, runID, projectID s
 		return "", err
 	}
 	createdAt = normalizeTime(createdAt)
-	imageDigestsJSON, err := json.Marshal(lock.ImageDigests)
-	if err != nil {
-		return "", fmt.Errorf("encode image digests: %w", err)
-	}
-	dependencyJSON, err := json.Marshal(lock.DependencyChecksums)
-	if err != nil {
-		return "", fmt.Errorf("encode dependency checksums: %w", err)
-	}
 	lockID := strings.TrimSpace(lock.LockID)
 	if lockID == "" {
 		return "", fmt.Errorf("lock id is required")
 	}
-	_, err = s.db.ExecContext(
+	if strings.TrimSpace(lock.EnvHash) == "" {
+		return "", fmt.Errorf("env hash is required")
+	}
+	_, err := s.db.ExecContext(
 		ctx,
 		insertRunEnvLockQuery,
-		lockID,
 		runID,
 		projectID,
+		lockID,
 		strings.TrimSpace(lock.EnvHash),
-		nullIfEmpty(lock.EnvTemplateID),
-		imageDigestsJSON,
-		dependencyJSON,
-		nullIfEmpty(lock.SBOMRef),
 		createdAt,
 		strings.TrimSpace(createdBy),
 		strings.TrimSpace(integritySHA),
@@ -258,33 +260,52 @@ func (s *RunBindingsStore) GetEnvLock(ctx context.Context, projectID, runID stri
 		return domain.EnvLock{}, fmt.Errorf("project id and run id are required")
 	}
 	var (
-		lock         domain.EnvLock
-		imageDigests []byte
-		depsJSON     []byte
-		envTemplate  sql.NullString
-		sbom         sql.NullString
+		lock             domain.EnvLock
+		imagesJSON       []byte
+		resourceDefaults []byte
+		resourceLimits   []byte
+		acceleratorsJSON []byte
+		depsJSON         []byte
 	)
-	row := s.db.QueryRowContext(
-		ctx,
-		selectRunEnvLockQuery,
-		projectID,
-		runID,
-	)
-	if err := row.Scan(&lock.LockID, &lock.EnvHash, &envTemplate, &imageDigests, &depsJSON, &sbom); err != nil {
+	row := s.db.QueryRowContext(ctx, selectRunEnvLockQuery, projectID, runID)
+	if err := row.Scan(
+		&lock.LockID,
+		&lock.EnvironmentDefinitionID,
+		&lock.EnvironmentDefinitionVersion,
+		&imagesJSON,
+		&resourceDefaults,
+		&resourceLimits,
+		&acceleratorsJSON,
+		&lock.NetworkClassRef,
+		&lock.SecretAccessClassRef,
+		&depsJSON,
+		&lock.SBOMRef,
+		&lock.EnvHash,
+		&lock.CreatedAt,
+		&lock.CreatedBy,
+		&lock.IntegritySHA256,
+	); err != nil {
 		return domain.EnvLock{}, handleNotFound(err)
 	}
-	if envTemplate.Valid {
-		lock.EnvTemplateID = envTemplate.String
-	}
-	if sbom.Valid {
-		lock.SBOMRef = sbom.String
-	}
-	if len(imageDigests) > 0 {
-		var digests map[string]string
-		if err := json.Unmarshal(imageDigests, &digests); err != nil {
-			return domain.EnvLock{}, fmt.Errorf("decode image digests: %w", err)
+	if len(imagesJSON) > 0 {
+		if err := json.Unmarshal(imagesJSON, &lock.Images); err != nil {
+			return domain.EnvLock{}, fmt.Errorf("decode images: %w", err)
 		}
-		lock.ImageDigests = digests
+	}
+	if len(resourceDefaults) > 0 {
+		if err := json.Unmarshal(resourceDefaults, &lock.ResourceDefaults); err != nil {
+			return domain.EnvLock{}, fmt.Errorf("decode resource defaults: %w", err)
+		}
+	}
+	if len(resourceLimits) > 0 {
+		if err := json.Unmarshal(resourceLimits, &lock.ResourceLimits); err != nil {
+			return domain.EnvLock{}, fmt.Errorf("decode resource limits: %w", err)
+		}
+	}
+	if len(acceleratorsJSON) > 0 {
+		if err := json.Unmarshal(acceleratorsJSON, &lock.AllowedAccelerators); err != nil {
+			return domain.EnvLock{}, fmt.Errorf("decode accelerators: %w", err)
+		}
 	}
 	if len(depsJSON) > 0 {
 		var deps map[string]string

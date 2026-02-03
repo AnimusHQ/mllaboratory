@@ -18,7 +18,6 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/repo"
 	"github.com/animus-labs/animus-go/closed/internal/repo/postgres"
-	"github.com/google/uuid"
 )
 
 const runSpecVersion = "1.0"
@@ -29,7 +28,7 @@ var (
 	errDatasetBindingsNeeded = errors.New("dataset bindings required")
 	errInvalidRunSpec        = errors.New("invalid run spec")
 	errDatasetVersionMissing = errors.New("dataset version not found")
-	errEnvTemplateMissing    = errors.New("environment template not found")
+	errEnvLockMissing        = errors.New("environment lock not found")
 )
 
 type createRunRequest struct {
@@ -37,7 +36,7 @@ type createRunRequest struct {
 	PipelineSpec    json.RawMessage   `json:"pipelineSpec"`
 	DatasetBindings map[string]string `json:"datasetBindings"`
 	CodeRef         runSpecCodeRef    `json:"codeRef"`
-	EnvLock         runSpecEnvLock    `json:"envLock"`
+	EnvLock         runSpecEnvLockRef `json:"envLock"`
 	Parameters      map[string]any    `json:"parameters"`
 }
 
@@ -48,13 +47,23 @@ type runSpecCodeRef struct {
 	SCMType   string `json:"scmType,omitempty"`
 }
 
-type runSpecEnvLock struct {
-	EnvHash             string            `json:"envHash"`
-	EnvTemplateID       string            `json:"envTemplateId,omitempty"`
-	ImageDigests        map[string]string `json:"imageDigests,omitempty"`
-	DependencyChecksums map[string]string `json:"dependencyChecksums,omitempty"`
-	SBOMRef             string            `json:"sbomRef,omitempty"`
-	LockID              string            `json:"lockId,omitempty"`
+type runSpecEnvLockRef struct {
+	LockID string `json:"lockId"`
+}
+
+type runSpecEnvLockPayload struct {
+	LockID                       string                      `json:"lockId"`
+	EnvironmentDefinitionID      string                      `json:"environmentDefinitionId"`
+	EnvironmentDefinitionVersion int                         `json:"environmentDefinitionVersion"`
+	Images                       []domain.EnvironmentImage   `json:"images"`
+	ResourceDefaults             domain.EnvironmentResources `json:"resourceDefaults,omitempty"`
+	ResourceLimits               domain.EnvironmentResources `json:"resourceLimits,omitempty"`
+	AllowedAccelerators          []string                    `json:"allowedAccelerators,omitempty"`
+	NetworkClassRef              string                      `json:"networkClassRef,omitempty"`
+	SecretAccessClassRef         string                      `json:"secretAccessClassRef,omitempty"`
+	DependencyChecksums          map[string]string           `json:"dependencyChecksums,omitempty"`
+	SBOMRef                      string                      `json:"sbomRef,omitempty"`
+	EnvHash                      string                      `json:"envHash"`
 }
 
 type createRunResponse struct {
@@ -103,13 +112,33 @@ func (api *experimentsAPI) handleCreateRun(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	policySnapshot, err := api.buildPolicySnapshot(r.Context(), projectID, identity)
+	lockID := strings.TrimSpace(req.EnvLock.LockID)
+	if lockID == "" {
+		api.writeError(w, r, http.StatusBadRequest, "environment_lock_required")
+		return
+	}
+	envStore := postgres.NewEnvironmentStore(api.db)
+	if envStore == nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	lockRecord, err := envStore.GetLock(r.Context(), projectID, lockID)
+	if err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			api.writeError(w, r, http.StatusNotFound, "environment_lock_not_found")
+			return
+		}
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	policySnapshot, err := api.buildPolicySnapshot(r.Context(), projectID, identity, lockRecord.Lock)
 	if err != nil {
 		api.writeError(w, r, http.StatusInternalServerError, "policy_snapshot_failed")
 		return
 	}
 
-	_, runSpec, err := buildRunSpec(projectID, identity.Subject, req, policySnapshot)
+	_, runSpec, err := buildRunSpec(projectID, identity.Subject, req, lockRecord.Lock, policySnapshot)
 	if err != nil {
 		switch err {
 		case errPipelineSpecRequired:
@@ -122,8 +151,8 @@ func (api *experimentsAPI) handleCreateRun(w http.ResponseWriter, r *http.Reques
 			api.writeError(w, r, http.StatusBadRequest, "invalid_run_spec")
 		case errDatasetVersionMissing:
 			api.writeError(w, r, http.StatusNotFound, "dataset_version_not_found")
-		case errEnvTemplateMissing:
-			api.writeError(w, r, http.StatusNotFound, "env_template_not_found")
+		case errEnvLockMissing:
+			api.writeError(w, r, http.StatusNotFound, "environment_lock_not_found")
 		default:
 			api.writeError(w, r, http.StatusInternalServerError, "internal_error")
 		}
@@ -133,15 +162,6 @@ func (api *experimentsAPI) handleCreateRun(w http.ResponseWriter, r *http.Reques
 	if err := api.ensureDatasetBindingsExist(r.Context(), projectID, runSpec.DatasetBindings); err != nil {
 		if errors.Is(err, errDatasetVersionMissing) {
 			api.writeError(w, r, http.StatusNotFound, "dataset_version_not_found")
-			return
-		}
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	if err := api.ensureEnvTemplateExists(r.Context(), projectID, runSpec.EnvLock.EnvTemplateID); err != nil {
-		if errors.Is(err, errEnvTemplateMissing) {
-			api.writeError(w, r, http.StatusNotFound, "env_template_not_found")
 			return
 		}
 		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
@@ -234,6 +254,27 @@ func (api *experimentsAPI) handleCreateRun(w http.ResponseWriter, r *http.Reques
 			api.writeError(w, r, http.StatusInternalServerError, "audit_failed")
 			return
 		}
+
+		_, err = auditlog.Insert(r.Context(), tx, auditlog.Event{
+			OccurredAt:   now,
+			Actor:        identity.Subject,
+			Action:       "policy.snapshot.materialized",
+			ResourceType: "policy_snapshot",
+			ResourceID:   runSpec.PolicySnapshot.SnapshotSHA256,
+			RequestID:    r.Header.Get("X-Request-Id"),
+			IP:           requestIP(r.RemoteAddr),
+			UserAgent:    r.UserAgent(),
+			Payload: map[string]any{
+				"service":                "experiments",
+				"project_id":             projectID,
+				"run_id":                 record.ID,
+				"policy_snapshot_sha256": runSpec.PolicySnapshot.SnapshotSHA256,
+			},
+		})
+		if err != nil {
+			api.writeError(w, r, http.StatusInternalServerError, "audit_failed")
+			return
+		}
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -316,7 +357,7 @@ func decodePipelineSpec(raw json.RawMessage) (domain.PipelineSpec, error) {
 	return spec, nil
 }
 
-func buildRunSpec(projectID, actor string, req createRunRequest, snapshot domain.PolicySnapshot) (domain.PipelineSpec, domain.RunSpec, error) {
+func buildRunSpec(projectID, actor string, req createRunRequest, envLock domain.EnvLock, snapshot domain.PolicySnapshot) (domain.PipelineSpec, domain.RunSpec, error) {
 	if len(req.PipelineSpec) == 0 {
 		return domain.PipelineSpec{}, domain.RunSpec{}, errPipelineSpecRequired
 	}
@@ -330,6 +371,9 @@ func buildRunSpec(projectID, actor string, req createRunRequest, snapshot domain
 	if req.DatasetBindings == nil {
 		return domain.PipelineSpec{}, domain.RunSpec{}, errDatasetBindingsNeeded
 	}
+	if strings.TrimSpace(envLock.LockID) == "" {
+		return domain.PipelineSpec{}, domain.RunSpec{}, errEnvLockMissing
+	}
 
 	runSpec := domain.RunSpec{
 		RunSpecVersion:  runSpecVersion,
@@ -342,14 +386,7 @@ func buildRunSpec(projectID, actor string, req createRunRequest, snapshot domain
 			Path:      strings.TrimSpace(req.CodeRef.Path),
 			SCMType:   strings.TrimSpace(req.CodeRef.SCMType),
 		},
-		EnvLock: domain.EnvLock{
-			LockID:              uuid.NewString(),
-			ImageDigests:        req.EnvLock.ImageDigests,
-			DependencyChecksums: req.EnvLock.DependencyChecksums,
-			EnvTemplateID:       strings.TrimSpace(req.EnvLock.EnvTemplateID),
-			EnvHash:             strings.TrimSpace(req.EnvLock.EnvHash),
-			SBOMRef:             strings.TrimSpace(req.EnvLock.SBOMRef),
-		},
+		EnvLock:        envLock,
 		Parameters:     req.Parameters,
 		PolicySnapshot: snapshot,
 		CreatedAt:      time.Now().UTC(),
@@ -373,13 +410,19 @@ func marshalRunSpec(spec domain.RunSpec, pipelineSpecJSON []byte) ([]byte, error
 			Path:      spec.CodeRef.Path,
 			SCMType:   spec.CodeRef.SCMType,
 		},
-		EnvLock: runSpecEnvLock{
-			EnvHash:             spec.EnvLock.EnvHash,
-			EnvTemplateID:       spec.EnvLock.EnvTemplateID,
-			ImageDigests:        spec.EnvLock.ImageDigests,
-			DependencyChecksums: spec.EnvLock.DependencyChecksums,
-			SBOMRef:             spec.EnvLock.SBOMRef,
-			LockID:              spec.EnvLock.LockID,
+		EnvLock: runSpecEnvLockPayload{
+			LockID:                       spec.EnvLock.LockID,
+			EnvironmentDefinitionID:      spec.EnvLock.EnvironmentDefinitionID,
+			EnvironmentDefinitionVersion: spec.EnvLock.EnvironmentDefinitionVersion,
+			Images:                       spec.EnvLock.Images,
+			ResourceDefaults:             spec.EnvLock.ResourceDefaults,
+			ResourceLimits:               spec.EnvLock.ResourceLimits,
+			AllowedAccelerators:          spec.EnvLock.AllowedAccelerators,
+			NetworkClassRef:              spec.EnvLock.NetworkClassRef,
+			SecretAccessClassRef:         spec.EnvLock.SecretAccessClassRef,
+			DependencyChecksums:          spec.EnvLock.DependencyChecksums,
+			SBOMRef:                      spec.EnvLock.SBOMRef,
+			EnvHash:                      spec.EnvLock.EnvHash,
 		},
 		Parameters:     spec.Parameters,
 		PolicySnapshot: spec.PolicySnapshot,
@@ -395,7 +438,7 @@ type runSpecPayload struct {
 	PipelineSpec    json.RawMessage       `json:"pipelineSpec"`
 	DatasetBindings map[string]string     `json:"datasetBindings"`
 	CodeRef         runSpecCodeRef        `json:"codeRef"`
-	EnvLock         runSpecEnvLock        `json:"envLock"`
+	EnvLock         runSpecEnvLockPayload `json:"envLock"`
 	Parameters      map[string]any        `json:"parameters"`
 	PolicySnapshot  domain.PolicySnapshot `json:"policySnapshot"`
 	CreatedAt       time.Time             `json:"createdAt"`
@@ -415,11 +458,18 @@ func hashRunSpec(spec domain.RunSpec) (string, error) {
 			SCMType:   spec.CodeRef.SCMType,
 		},
 		EnvLock: canonicalEnvLock{
-			EnvHash:             spec.EnvLock.EnvHash,
-			EnvTemplateID:       spec.EnvLock.EnvTemplateID,
-			ImageDigests:        sortedDigests(spec.EnvLock.ImageDigests),
-			DependencyChecksums: sortedChecksums(spec.EnvLock.DependencyChecksums),
-			SBOMRef:             spec.EnvLock.SBOMRef,
+			LockID:                       spec.EnvLock.LockID,
+			EnvironmentDefinitionID:      spec.EnvLock.EnvironmentDefinitionID,
+			EnvironmentDefinitionVersion: spec.EnvLock.EnvironmentDefinitionVersion,
+			Images:                       canonicalImages(spec.EnvLock.Images),
+			ResourceDefaults:             spec.EnvLock.ResourceDefaults,
+			ResourceLimits:               spec.EnvLock.ResourceLimits,
+			AllowedAccelerators:          canonicalAccelerators(spec.EnvLock.AllowedAccelerators),
+			NetworkClassRef:              spec.EnvLock.NetworkClassRef,
+			SecretAccessClassRef:         spec.EnvLock.SecretAccessClassRef,
+			DependencyChecksums:          sortedChecksums(spec.EnvLock.DependencyChecksums),
+			SBOMRef:                      spec.EnvLock.SBOMRef,
+			EnvHash:                      spec.EnvLock.EnvHash,
 		},
 		Parameters:        canonicalParameters(spec.Parameters),
 		PolicySnapshotSHA: spec.PolicySnapshot.SnapshotSHA256,
@@ -444,11 +494,18 @@ type canonicalRunSpec struct {
 }
 
 type canonicalEnvLock struct {
-	EnvHash             string         `json:"envHash"`
-	EnvTemplateID       string         `json:"envTemplateId,omitempty"`
-	ImageDigests        []digestPair   `json:"imageDigests,omitempty"`
-	DependencyChecksums []checksumPair `json:"dependencyChecksums,omitempty"`
-	SBOMRef             string         `json:"sbomRef,omitempty"`
+	LockID                       string                      `json:"lockId"`
+	EnvironmentDefinitionID      string                      `json:"environmentDefinitionId"`
+	EnvironmentDefinitionVersion int                         `json:"environmentDefinitionVersion"`
+	Images                       []canonicalImage            `json:"images"`
+	ResourceDefaults             domain.EnvironmentResources `json:"resourceDefaults,omitempty"`
+	ResourceLimits               domain.EnvironmentResources `json:"resourceLimits,omitempty"`
+	AllowedAccelerators          []string                    `json:"allowedAccelerators,omitempty"`
+	NetworkClassRef              string                      `json:"networkClassRef,omitempty"`
+	SecretAccessClassRef         string                      `json:"secretAccessClassRef,omitempty"`
+	DependencyChecksums          []checksumPair              `json:"dependencyChecksums,omitempty"`
+	SBOMRef                      string                      `json:"sbomRef,omitempty"`
+	EnvHash                      string                      `json:"envHash"`
 }
 
 type bindingPair struct {
@@ -456,9 +513,10 @@ type bindingPair struct {
 	DatasetVersionID string `json:"datasetVersionId"`
 }
 
-type digestPair struct {
-	ImageRef string `json:"imageRef"`
-	Digest   string `json:"digest"`
+type canonicalImage struct {
+	Name   string `json:"name"`
+	Ref    string `json:"ref"`
+	Digest string `json:"digest"`
 }
 
 type checksumPair struct {
@@ -690,22 +748,33 @@ func sortedBindings(bindings map[string]string) []bindingPair {
 	return out
 }
 
-func sortedDigests(digests map[string]string) []digestPair {
-	if len(digests) == 0 {
-		return []digestPair{}
+func canonicalImages(images []domain.EnvironmentImage) []canonicalImage {
+	if len(images) == 0 {
+		return []canonicalImage{}
 	}
-	keys := make([]string, 0, len(digests))
-	for key := range digests {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	out := make([]digestPair, 0, len(keys))
-	for _, key := range keys {
-		out = append(out, digestPair{
-			ImageRef: key,
-			Digest:   digests[key],
+	out := make([]canonicalImage, 0, len(images))
+	for _, image := range images {
+		out = append(out, canonicalImage{
+			Name:   image.Name,
+			Ref:    image.Ref,
+			Digest: image.Digest,
 		})
 	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Name == out[j].Name {
+			return out[i].Ref < out[j].Ref
+		}
+		return out[i].Name < out[j].Name
+	})
+	return out
+}
+
+func canonicalAccelerators(accels []string) []string {
+	if len(accels) == 0 {
+		return []string{}
+	}
+	out := append([]string{}, accels...)
+	sort.Strings(out)
 	return out
 }
 

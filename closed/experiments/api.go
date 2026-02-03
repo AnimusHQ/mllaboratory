@@ -87,6 +87,15 @@ func (api *experimentsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects/{project_id}/runs/{run_id}:dry-run", api.handleDryRun)
 	mux.HandleFunc("GET /projects/{project_id}/runs/{run_id}:dry-run", api.handleGetDryRun)
 
+	mux.HandleFunc("POST /projects/{project_id}/environment-definitions", api.handleCreateEnvironmentDefinition)
+	mux.HandleFunc("GET /projects/{project_id}/environment-definitions", api.handleListEnvironmentDefinitions)
+	mux.HandleFunc("GET /projects/{project_id}/environment-definitions/{definition_id}", api.handleGetEnvironmentDefinition)
+	mux.HandleFunc("POST /projects/{project_id}/environment-definitions/{definition_id}:update", api.handleUpdateEnvironmentDefinition)
+	mux.HandleFunc("POST /projects/{project_id}/environment-definitions/{definition_id}:archive", api.handleArchiveEnvironmentDefinition)
+	mux.HandleFunc("POST /projects/{project_id}/environment-locks", api.handleCreateEnvironmentLock)
+	mux.HandleFunc("GET /projects/{project_id}/environment-locks", api.handleListEnvironmentLocks)
+	mux.HandleFunc("GET /projects/{project_id}/environment-locks/{lock_id}", api.handleGetEnvironmentLock)
+
 	mux.HandleFunc("GET /experiments/{experiment_id}/runs", api.handleListExperimentRuns)
 	mux.HandleFunc("POST /experiments/{experiment_id}/runs", api.handleCreateExperimentRun)
 	mux.HandleFunc("POST /experiments/runs:execute", api.handleExecuteExperimentRun)
