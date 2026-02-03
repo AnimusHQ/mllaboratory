@@ -18,6 +18,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auditlog"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/lineageevent"
+	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
 )
@@ -129,6 +130,7 @@ func (api *experimentsAPI) handleCreateExperimentRunArtifact(w http.ResponseWrit
 			return
 		}
 	}
+	metadata = redaction.RedactMetadata(metadata)
 	metadataJSON, err := json.Marshal(metadata)
 	if err != nil {
 		api.writeError(w, r, http.StatusInternalServerError, "internal_error")

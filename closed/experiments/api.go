@@ -17,6 +17,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/lineageevent"
 	"github.com/animus-labs/animus-go/closed/internal/platform/objectstore"
+	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 	"github.com/animus-labs/animus-go/closed/internal/repo"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -131,6 +132,7 @@ func (api *experimentsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /internal/cp/runs/{run_id}/heartbeat", api.handleDPHeartbeat)
 	mux.HandleFunc("POST /internal/cp/runs/{run_id}/terminal", api.handleDPTerminal)
 	mux.HandleFunc("POST /internal/cp/runs/{run_id}/artifact-committed", api.handleDPArtifactCommitted)
+	mux.HandleFunc("POST /internal/cp/runs/{run_id}/secrets-accessed", api.handleDPSecretAccessed)
 
 	mux.HandleFunc("GET /policies", api.handleListPolicies)
 	mux.HandleFunc("POST /policies", api.handleCreatePolicy)
@@ -194,6 +196,7 @@ func (api *experimentsAPI) handleCreateExperiment(w http.ResponseWriter, r *http
 	if metadataMap == nil {
 		metadataMap = map[string]any{}
 	}
+	metadataMap = redaction.RedactMetadata(metadataMap)
 	metadataJSON, err := json.Marshal(metadataMap)
 	if err != nil {
 		api.writeError(w, r, http.StatusBadRequest, "invalid_metadata")
@@ -1288,7 +1291,7 @@ func normalizeJSON(raw []byte) json.RawMessage {
 	if len(raw) == 0 || string(raw) == "null" {
 		return []byte("{}")
 	}
-	return raw
+	return redaction.RedactJSON(raw)
 }
 
 func bytesTrimSpace(in []byte) []byte {

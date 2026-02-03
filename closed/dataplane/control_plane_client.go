@@ -82,6 +82,13 @@ func (c *controlPlaneClient) SendArtifactCommitted(ctx context.Context, event da
 	return out, status, err
 }
 
+func (c *controlPlaneClient) SendSecretAccessed(ctx context.Context, event dataplane.SecretAccessed, requestID string) (dataplane.SecretAccessedResponse, int, error) {
+	path := fmt.Sprintf("/internal/cp/runs/%s/secrets-accessed", strings.TrimSpace(event.RunID))
+	var out dataplane.SecretAccessedResponse
+	status, err := c.postJSON(ctx, path, event, requestID, &out)
+	return out, status, err
+}
+
 func (c *controlPlaneClient) postJSON(ctx context.Context, path string, payload any, requestID string, out any) (int, error) {
 	body, err := json.Marshal(payload)
 	if err != nil {

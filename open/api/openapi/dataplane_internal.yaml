@@ -280,6 +280,61 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /internal/cp/runs/{run_id}/secrets-accessed:
+    post:
+      tags: [control-plane]
+      summary: Передать событие доступа к секретам выполнения Run от DP в CP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecretAccessed"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretAccessedResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+
 components:
   schemas:
     ErrorResponse:
@@ -437,6 +492,40 @@ components:
           type: object
           additionalProperties: true
     ArtifactCommittedResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, duplicate]
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+    SecretAccessed:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, projectId, emittedAt]
+      properties:
+        eventId:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        classRef:
+          type: string
+        leaseId:
+          type: string
+        subject:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    SecretAccessedResponse:
       type: object
       additionalProperties: false
       required: [accepted, duplicate]

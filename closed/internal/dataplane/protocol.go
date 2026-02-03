@@ -6,6 +6,7 @@ const (
 	EventTypeHeartbeat         = "heartbeat"
 	EventTypeTerminal          = "terminal"
 	EventTypeArtifactCommitted = "artifact_committed"
+	EventTypeSecretAccessed    = "secret_accessed"
 )
 
 const (
@@ -91,6 +92,23 @@ type ArtifactCommitted struct {
 }
 
 type ArtifactCommittedResponse struct {
+	Accepted  bool `json:"accepted"`
+	Duplicate bool `json:"duplicate"`
+}
+
+type SecretAccessed struct {
+	EventID       string         `json:"eventId"`
+	RunID         string         `json:"runId"`
+	ProjectID     string         `json:"projectId"`
+	ClassRef      string         `json:"classRef,omitempty"`
+	LeaseID       string         `json:"leaseId,omitempty"`
+	Subject       string         `json:"subject,omitempty"`
+	EmittedAt     time.Time      `json:"emittedAt"`
+	CorrelationID string         `json:"correlationId,omitempty"`
+	Details       map[string]any `json:"details,omitempty"`
+}
+
+type SecretAccessedResponse struct {
 	Accepted  bool `json:"accepted"`
 	Duplicate bool `json:"duplicate"`
 }

@@ -251,7 +251,7 @@ func outToString(runes []rune) string {
 	return string(runes)
 }
 
-func buildJobSpec(runSpec domain.RunSpec, runID, jobName, namespace string, ttlSeconds int32, serviceAccount, dispatchID string) (k8s.Job, error) {
+func buildJobSpec(runSpec domain.RunSpec, runID, jobName, namespace string, ttlSeconds int32, serviceAccount, dispatchID string, secretEnv map[string]string) (k8s.Job, error) {
 	steps := runSpec.PipelineSpec.Spec.Steps
 	if len(steps) != 1 {
 		return k8s.Job{}, errors.New("single step pipeline required")
@@ -288,7 +288,7 @@ func buildJobSpec(runSpec domain.RunSpec, runID, jobName, namespace string, ttlS
 		Image:     image,
 		Command:   step.Command,
 		Args:      step.Args,
-		Env:       buildEnvVars(runSpec, runID, step),
+		Env:       buildEnvVars(runSpec, runID, step, secretEnv),
 		Resources: containerResources,
 	}
 
@@ -399,7 +399,7 @@ func buildResourceRequirements(requests domain.EnvironmentResources, limits doma
 	return out
 }
 
-func buildEnvVars(runSpec domain.RunSpec, runID string, step domain.PipelineStep) []k8s.EnvVar {
+func buildEnvVars(runSpec domain.RunSpec, runID string, step domain.PipelineStep, secretEnv map[string]string) []k8s.EnvVar {
 	out := []k8s.EnvVar{}
 	appendEnv := func(name, value string) {
 		name = strings.TrimSpace(name)
@@ -442,6 +442,19 @@ func buildEnvVars(runSpec domain.RunSpec, runID string, step domain.PipelineStep
 			continue
 		}
 		out = append(out, k8s.EnvVar{Name: name, Value: env.Value})
+	}
+	for key, value := range secretEnv {
+		name := strings.TrimSpace(key)
+		if name == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.ToUpper(name), "ANIMUS_") {
+			continue
+		}
+		if _, ok := reserved[name]; ok {
+			continue
+		}
+		out = append(out, k8s.EnvVar{Name: name, Value: value})
 	}
 	return out
 }

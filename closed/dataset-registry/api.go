@@ -22,6 +22,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/lineageevent"
 	"github.com/animus-labs/animus-go/closed/internal/platform/objectstore"
+	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 	"github.com/animus-labs/animus-go/closed/internal/repo"
 	artifactsvc "github.com/animus-labs/animus-go/closed/internal/service/artifacts"
 	"github.com/google/uuid"
@@ -171,7 +172,8 @@ func (api *datasetRegistryAPI) handleCreateProject(w http.ResponseWriter, r *htt
 	}
 
 	projectID, _ := auth.ProjectIDFromContext(r.Context())
-	proj, err := api.svc.CreateProject(r.Context(), projectID, name, strings.TrimSpace(req.Description), req.Metadata, buildAuditContext(r, identity))
+	metadata := redaction.RedactMetadata(req.Metadata)
+	proj, err := api.svc.CreateProject(r.Context(), projectID, name, strings.TrimSpace(req.Description), metadata, buildAuditContext(r, identity))
 	if err != nil {
 		if isUniqueViolation(err) {
 			api.writeError(w, r, http.StatusConflict, "project_name_exists")
@@ -253,7 +255,8 @@ func (api *datasetRegistryAPI) handleCreateDataset(w http.ResponseWriter, r *htt
 	}
 	description := strings.TrimSpace(req.Description)
 
-	ds, err := api.svc.CreateDataset(r.Context(), projectID, name, description, req.Metadata, buildAuditContext(r, identity))
+	metadata := redaction.RedactMetadata(req.Metadata)
+	ds, err := api.svc.CreateDataset(r.Context(), projectID, name, description, metadata, buildAuditContext(r, identity))
 	if err != nil {
 		if isUniqueViolation(err) {
 			api.writeError(w, r, http.StatusConflict, "dataset_name_exists")
@@ -592,6 +595,7 @@ func (api *datasetRegistryAPI) handleUploadDatasetVersion(w http.ResponseWriter,
 	metadataMap["filename"] = filename
 	metadataMap["content_type"] = contentType
 	metadataMap["content_sha256"] = contentSHA256
+	metadataMap = redaction.RedactMetadata(metadataMap)
 	metadataJSON, err := json.Marshal(metadataMap)
 	if err != nil {
 		_ = api.store.RemoveObject(r.Context(), api.storeCfg.BucketDatasets, uploadedObjectKey, minio.RemoveObjectOptions{})
@@ -908,7 +912,7 @@ func (api *datasetRegistryAPI) handleCreateArtifact(w http.ResponseWriter, r *ht
 			SHA256:         strings.TrimSpace(req.SHA256),
 			RetentionUntil: req.RetentionUntil,
 			LegalHold:      req.LegalHold,
-			Metadata:       req.Metadata,
+			Metadata:       redaction.RedactMetadata(req.Metadata),
 		},
 		buildArtifactAuditContext(r, identity),
 	)

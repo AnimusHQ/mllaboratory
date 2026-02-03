@@ -539,3 +539,150 @@ func dispatchStatusFromRunState(state domain.RunState) string {
 		return dataplane.DispatchStatusError
 	}
 }
+
+func (api *experimentsAPI) handleDPSecretAccessed(w http.ResponseWriter, r *http.Request) {
+	identity, ok := auth.IdentityFromContext(r.Context())
+	if !ok || strings.TrimSpace(identity.Subject) == "" {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	runID := strings.TrimSpace(r.PathValue("run_id"))
+	if runID == "" {
+		api.writeError(w, r, http.StatusBadRequest, "run_id_required")
+		return
+	}
+
+	var req dataplane.SecretAccessed
+	if err := decodeJSON(r, &req); err != nil {
+		api.writeError(w, r, http.StatusBadRequest, "invalid_json")
+		return
+	}
+	if strings.TrimSpace(req.RunID) == "" {
+		api.writeError(w, r, http.StatusBadRequest, "run_id_required")
+		return
+	}
+	if strings.TrimSpace(req.EventID) == "" {
+		api.writeError(w, r, http.StatusBadRequest, "event_id_required")
+		return
+	}
+	if strings.TrimSpace(req.ProjectID) == "" {
+		api.writeError(w, r, http.StatusBadRequest, "project_id_required")
+		return
+	}
+	if !strings.EqualFold(req.RunID, runID) {
+		api.writeError(w, r, http.StatusBadRequest, "run_id_mismatch")
+		return
+	}
+	if req.EmittedAt.IsZero() {
+		api.writeError(w, r, http.StatusBadRequest, "emitted_at_required")
+		return
+	}
+
+	projectID := strings.TrimSpace(req.ProjectID)
+	runStore := postgres.NewRunSpecStore(api.db)
+	if runStore == nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if _, err := runStore.GetRun(r.Context(), projectID, runID); err != nil {
+		if errors.Is(err, repo.ErrNotFound) {
+			api.writeError(w, r, http.StatusNotFound, "not_found")
+			return
+		}
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	payloadJSON, err := json.Marshal(req)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	integrity, err := integritySHA256(dpEventIntegrityInput{
+		EventID:   strings.TrimSpace(req.EventID),
+		RunID:     runID,
+		ProjectID: projectID,
+		EventType: dataplane.EventTypeSecretAccessed,
+		EmittedAt: req.EmittedAt.UTC(),
+		Payload:   payloadJSON,
+	})
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	tx, err := api.db.BeginTx(r.Context(), nil)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	dpStore := postgres.NewDPEventStore(tx)
+	if dpStore == nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	inserted, err := dpStore.InsertEvent(r.Context(), postgres.RunDPEventRecord{
+		EventID:      req.EventID,
+		RunID:        runID,
+		ProjectID:    projectID,
+		EventType:    dataplane.EventTypeSecretAccessed,
+		Payload:      payloadJSON,
+		EmittedAt:    req.EmittedAt.UTC(),
+		ReceivedAt:   time.Now().UTC(),
+		IntegritySHA: integrity,
+	})
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	duplicate := !inserted
+	if duplicate {
+		if err := ensureDPEventMatches(r.Context(), dpStore, req.EventID, runID, projectID, dataplane.EventTypeSecretAccessed); err != nil {
+			if errors.Is(err, errDPEventMismatch) {
+				api.writeError(w, r, http.StatusConflict, "event_conflict")
+				return
+			}
+			api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+			return
+		}
+	}
+
+	if inserted {
+		auditAppender := postgres.NewAuditAppender(tx, nil)
+		if auditAppender != nil {
+			payload := domain.Metadata{
+				"project_id":     projectID,
+				"run_id":         runID,
+				"subject":        strings.TrimSpace(req.Subject),
+				"class_ref":      strings.TrimSpace(req.ClassRef),
+				"lease_id":       strings.TrimSpace(req.LeaseID),
+				"correlation_id": strings.TrimSpace(req.CorrelationID),
+			}
+			_, _ = auditAppender.Append(r.Context(), domain.AuditEvent{
+				OccurredAt:   time.Now().UTC(),
+				Actor:        strings.TrimSpace(identity.Subject),
+				Action:       "secret.accessed",
+				ResourceType: "run",
+				ResourceID:   runID,
+				RequestID:    r.Header.Get("X-Request-Id"),
+				IP:           requestIP(r.RemoteAddr),
+				UserAgent:    r.UserAgent(),
+				Payload:      payload,
+			})
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+
+	api.writeJSON(w, http.StatusOK, dataplane.SecretAccessedResponse{
+		Accepted:  !duplicate,
+		Duplicate: duplicate,
+	})
+}

@@ -18,7 +18,7 @@ func TestBuildJobSpecUsesEnvLockDigest(t *testing.T) {
 	runSpec.EnvLock.NetworkClassRef = "net-class"
 	runSpec.EnvLock.SecretAccessClassRef = "secret-class"
 
-	job, err := buildJobSpec(runSpec, "run-1", "job-1", "ns", 0, "", "dispatch-1")
+	job, err := buildJobSpec(runSpec, "run-1", "job-1", "ns", 0, "", "dispatch-1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -87,7 +87,7 @@ func TestBuildJobSpecRejectsMultipleSteps(t *testing.T) {
 	runSpec := minimalRunSpec("runtime", []domain.EnvironmentImage{{Name: "runtime", Ref: validImageRef, Digest: validDigest}})
 	runSpec.PipelineSpec.Spec.Steps = append(runSpec.PipelineSpec.Spec.Steps, runSpec.PipelineSpec.Spec.Steps[0])
 
-	if _, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1"); err == nil {
+	if _, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1", nil); err == nil {
 		t.Fatalf("expected error for multiple steps")
 	}
 }
@@ -95,7 +95,7 @@ func TestBuildJobSpecRejectsMultipleSteps(t *testing.T) {
 func TestBuildJobSpecRejectsUnresolvedImage(t *testing.T) {
 	runSpec := minimalRunSpec("ghcr.io/acme/train:latest", nil)
 
-	if _, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1"); err == nil {
+	if _, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1", nil); err == nil {
 		t.Fatalf("expected error for unresolved image")
 	}
 }
@@ -104,7 +104,7 @@ func TestBuildJobSpecAcceptsDigestImage(t *testing.T) {
 	pinned := "ghcr.io/acme/train@" + validDigest
 	runSpec := minimalRunSpec(pinned, nil)
 
-	job, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1")
+	job, err := buildJobSpec(runSpec, "run-1", "job-1", "", 0, "", "dispatch-1", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

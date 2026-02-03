@@ -11,6 +11,8 @@ import (
 	"net"
 	"strings"
 	"time"
+
+	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 )
 
 type Event struct {
@@ -67,6 +69,7 @@ func Insert(ctx context.Context, q QueryRower, event Event) (int64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("marshal payload: %w", err)
 	}
+	payloadJSON = redaction.RedactJSON(payloadJSON)
 
 	ipStr := strings.TrimSpace(event.IP.String())
 	integrity, err := ComputeIntegritySHA256(event, payloadJSON)

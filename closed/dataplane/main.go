@@ -14,6 +14,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/env"
 	"github.com/animus-labs/animus-go/closed/internal/platform/httpserver"
 	"github.com/animus-labs/animus-go/closed/internal/platform/k8s"
+	"github.com/animus-labs/animus-go/closed/internal/platform/secrets"
 )
 
 func main() {
@@ -66,6 +67,17 @@ func main() {
 		os.Exit(2)
 	}
 
+	secretsCfg, err := secrets.ConfigFromEnv()
+	if err != nil {
+		logger.Error("invalid secrets config", "error", err)
+		os.Exit(2)
+	}
+	secretsManager, err := secrets.NewManager(secretsCfg)
+	if err != nil {
+		logger.Error("secrets manager init failed", "error", err)
+		os.Exit(2)
+	}
+
 	cpClient, err := newControlPlaneClient(cpBaseURL, internalAuthSecret)
 	if err != nil {
 		logger.Error("control plane client init failed", "error", err)
@@ -78,7 +90,7 @@ func main() {
 		JobServiceAccount: jobServiceAccount,
 		HeartbeatInterval: heartbeatInterval,
 		PollInterval:      pollInterval,
-	})
+	}, secretsManager)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", httpserver.Healthz("dataplane"))

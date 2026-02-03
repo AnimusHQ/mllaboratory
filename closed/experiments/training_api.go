@@ -14,6 +14,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auditlog"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/lineageevent"
+	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 	"github.com/animus-labs/animus-go/closed/internal/platform/policy"
 	"github.com/animus-labs/animus-go/closed/internal/runtimeexec"
 	"github.com/google/uuid"
@@ -1145,7 +1146,7 @@ func (api *experimentsAPI) handleCreateExperimentRunEvent(w http.ResponseWriter,
 		return
 	}
 
-	message := strings.TrimSpace(req.Message)
+	message := redaction.RedactString(strings.TrimSpace(req.Message))
 	if message == "" {
 		api.writeError(w, r, http.StatusBadRequest, "message_required")
 		return
@@ -1170,6 +1171,7 @@ func (api *experimentsAPI) handleCreateExperimentRunEvent(w http.ResponseWriter,
 	if metaMap == nil {
 		metaMap = map[string]any{}
 	}
+	metaMap = redaction.RedactMetadata(metaMap)
 	metaJSON, err := json.Marshal(metaMap)
 	if err != nil {
 		api.writeError(w, r, http.StatusBadRequest, "invalid_metadata")
