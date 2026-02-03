@@ -6,6 +6,8 @@
 !/closed/migrations/*.sql
 !/closed/experiments/
 !/closed/experiments/*.go
+!/closed/dataplane/
+!/closed/dataplane/*.go
 !/closed/dataset-registry/
 !/closed/dataset-registry/*.go
 !/closed/audit/
