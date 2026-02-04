@@ -3,14 +3,29 @@ package secrets
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 )
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
+}
+
+func newResponse(status int, body string) *http.Response {
+	return &http.Response{
+		StatusCode: status,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     make(http.Header),
+	}
+}
 
 func writeTempJWT(t *testing.T, value string) string {
 	t.Helper()
@@ -29,32 +44,30 @@ func TestVaultK8sFetchSuccess(t *testing.T) {
 
 	authCalled := false
 	secretCalled := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/v1/auth/kubernetes/login":
 			authCalled = true
 			var body map[string]string
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				w.WriteHeader(http.StatusBadRequest)
-				return
+				return newResponse(http.StatusBadRequest, ""), nil
 			}
 			if body["role"] != "role" || body["jwt"] != jwt {
-				w.WriteHeader(http.StatusBadRequest)
-				return
+				return newResponse(http.StatusBadRequest, ""), nil
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			payload, _ := json.Marshal(map[string]any{
 				"auth": map[string]any{
 					"client_token":   authToken,
 					"lease_duration": 60,
 				},
 			})
+			return newResponse(http.StatusOK, string(payload)), nil
 		case "/v1/secret/data/app":
 			secretCalled = true
 			if r.Header.Get("X-Vault-Token") != authToken {
-				w.WriteHeader(http.StatusForbidden)
-				return
+				return newResponse(http.StatusForbidden, ""), nil
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			payload, _ := json.Marshal(map[string]any{
 				"lease_id":       "lease-123",
 				"lease_duration": 30,
 				"data": map[string]any{
@@ -63,25 +76,26 @@ func TestVaultK8sFetchSuccess(t *testing.T) {
 					},
 				},
 			})
+			return newResponse(http.StatusOK, string(payload)), nil
 		default:
-			w.WriteHeader(http.StatusNotFound)
+			return newResponse(http.StatusNotFound, ""), nil
 		}
-	}))
-	defer server.Close()
+	})
 
 	cfg := Config{
 		Provider:      "vault_k8s",
-		VaultAddr:     server.URL,
+		VaultAddr:     "http://vault.test",
 		VaultRole:     "role",
 		VaultAuthPath: "auth/kubernetes/login",
 		VaultJWTPath:  jwtPath,
 		VaultTimeout:  2 * time.Second,
 		LeaseTTL:      10 * time.Second,
 	}
-	mgr, err := NewManager(cfg)
+	mgr, err := NewVaultK8sManager(cfg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
+	mgr.http = &http.Client{Transport: rt}
 
 	lease, err := mgr.Fetch(context.Background(), Request{ClassRef: "secret/data/app"})
 	if err != nil {
@@ -108,37 +122,37 @@ func TestVaultK8sFetchUnauthorizedDoesNotLeak(t *testing.T) {
 	secretLeak := "very-secret-value"
 	jwtPath := writeTempJWT(t, jwt)
 
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/v1/auth/kubernetes/login":
-			_ = json.NewEncoder(w).Encode(map[string]any{
+			payload, _ := json.Marshal(map[string]any{
 				"auth": map[string]any{
 					"client_token":   authToken,
 					"lease_duration": 60,
 				},
 			})
+			return newResponse(http.StatusOK, string(payload)), nil
 		case "/v1/secret/data/app":
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte(secretLeak))
+			return newResponse(http.StatusForbidden, secretLeak), nil
 		default:
-			w.WriteHeader(http.StatusNotFound)
+			return newResponse(http.StatusNotFound, ""), nil
 		}
-	}))
-	defer server.Close()
+	})
 
 	cfg := Config{
 		Provider:      "vault_k8s",
-		VaultAddr:     server.URL,
+		VaultAddr:     "http://vault.test",
 		VaultRole:     "role",
 		VaultAuthPath: "auth/kubernetes/login",
 		VaultJWTPath:  jwtPath,
 		VaultTimeout:  2 * time.Second,
 		LeaseTTL:      10 * time.Second,
 	}
-	mgr, err := NewManager(cfg)
+	mgr, err := NewVaultK8sManager(cfg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
+	mgr.http = &http.Client{Transport: rt}
 
 	_, err = mgr.Fetch(context.Background(), Request{ClassRef: "secret/data/app"})
 	if err == nil {
@@ -152,63 +166,70 @@ func TestVaultK8sFetchUnauthorizedDoesNotLeak(t *testing.T) {
 
 func TestVaultK8sAuthTimeout(t *testing.T) {
 	jwtPath := writeTempJWT(t, "jwt")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(50 * time.Millisecond)
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer server.Close()
+	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		return nil, context.DeadlineExceeded
+	})
 
 	cfg := Config{
 		Provider:      "vault_k8s",
-		VaultAddr:     server.URL,
+		VaultAddr:     "http://vault.test",
 		VaultRole:     "role",
 		VaultAuthPath: "auth/kubernetes/login",
 		VaultJWTPath:  jwtPath,
 		VaultTimeout:  5 * time.Millisecond,
 	}
-	mgr, err := NewManager(cfg)
+	mgr, err := NewVaultK8sManager(cfg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
+	mgr.http = &http.Client{Transport: rt, Timeout: 5 * time.Millisecond}
 
 	_, err = mgr.Fetch(context.Background(), Request{ClassRef: "secret/data/app"})
 	if err == nil {
 		t.Fatalf("expected timeout error")
 	}
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected deadline error, got: %v", err)
+	}
 }
 
 func TestVaultK8sLeaseExpired(t *testing.T) {
 	jwtPath := writeTempJWT(t, "jwt")
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/v1/auth/kubernetes/login" {
-			w.WriteHeader(http.StatusNotFound)
-			return
+	secretCalled := false
+	rt := roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/v1/auth/kubernetes/login" {
+			payload, _ := json.Marshal(map[string]any{
+				"auth": map[string]any{
+					"client_token":   "token",
+					"lease_duration": 0,
+				},
+			})
+			return newResponse(http.StatusOK, string(payload)), nil
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{
-			"auth": map[string]any{
-				"client_token":   "token",
-				"lease_duration": 0,
-			},
-		})
-	}))
-	defer server.Close()
+		secretCalled = true
+		return newResponse(http.StatusNotFound, ""), nil
+	})
 
 	cfg := Config{
 		Provider:      "vault_k8s",
-		VaultAddr:     server.URL,
+		VaultAddr:     "http://vault.test",
 		VaultRole:     "role",
 		VaultAuthPath: "auth/kubernetes/login",
 		VaultJWTPath:  jwtPath,
 		VaultTimeout:  2 * time.Second,
 		LeaseTTL:      0,
 	}
-	mgr, err := NewManager(cfg)
+	mgr, err := NewVaultK8sManager(cfg)
 	if err != nil {
 		t.Fatalf("new manager: %v", err)
 	}
+	mgr.http = &http.Client{Transport: rt}
 
 	_, err = mgr.Fetch(context.Background(), Request{ClassRef: "secret/data/app"})
 	if err == nil {
 		t.Fatalf("expected lease expiry error")
+	}
+	if secretCalled {
+		t.Fatalf("secret should not be requested when auth lease expired")
 	}
 }
