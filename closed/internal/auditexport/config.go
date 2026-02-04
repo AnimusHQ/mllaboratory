@@ -11,19 +11,24 @@ import (
 
 // Config controls audit export format and destination.
 type Config struct {
-	Format      string
-	Destination string
-	WebhookURL  string
-	WebhookHeaders map[string]string
-	SyslogAddr  string
-	SyslogProtocol string
-	SyslogTag   string
+	Format           string
+	Destination      string
+	WebhookURL       string
+	WebhookHeaders   map[string]string
+	WebhookSecretRef string
+	SigningSecretKey string
+	SyslogAddr       string
+	SyslogProtocol   string
+	SyslogTag        string
 
-	BatchSize       int
-	PollInterval    time.Duration
-	RetryBaseDelay  time.Duration
-	RetryMaxDelay   time.Duration
-	InflightTimeout time.Duration
+	BatchSize         int
+	PollInterval      time.Duration
+	RetryBaseDelay    time.Duration
+	RetryMaxDelay     time.Duration
+	InflightTimeout   time.Duration
+	HTTPTimeout       time.Duration
+	MaxAttempts       int
+	WorkerConcurrency int
 }
 
 func ConfigFromEnv() (Config, error) {
@@ -54,20 +59,37 @@ func ConfigFromEnv() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	httpTimeout, err := env.Duration("AUDIT_EXPORT_HTTP_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	maxAttempts, err := env.Int("AUDIT_EXPORT_MAX_ATTEMPTS", 10)
+	if err != nil {
+		return Config{}, err
+	}
+	workerConcurrency, err := env.Int("AUDIT_EXPORT_WORKER_CONCURRENCY", 4)
+	if err != nil {
+		return Config{}, err
+	}
 
 	cfg := Config{
-		Format:      env.String("AUDIT_EXPORT_FORMAT", "ndjson"),
-		Destination: env.String("AUDIT_EXPORT_DESTINATION", "none"),
-		WebhookURL:  env.String("AUDIT_EXPORT_WEBHOOK_URL", ""),
-		WebhookHeaders: headers,
-		SyslogAddr:  env.String("AUDIT_EXPORT_SYSLOG_ADDR", ""),
-		SyslogProtocol: env.String("AUDIT_EXPORT_SYSLOG_PROTOCOL", "udp"),
-		SyslogTag:   env.String("AUDIT_EXPORT_SYSLOG_TAG", "animus-audit"),
-		BatchSize:       batchSize,
-		PollInterval:    pollInterval,
-		RetryBaseDelay:  retryBase,
-		RetryMaxDelay:   retryMax,
-		InflightTimeout: inflightTimeout,
+		Format:            env.String("AUDIT_EXPORT_FORMAT", "ndjson"),
+		Destination:       env.String("AUDIT_EXPORT_DESTINATION", "none"),
+		WebhookURL:        env.String("AUDIT_EXPORT_WEBHOOK_URL", ""),
+		WebhookHeaders:    headers,
+		WebhookSecretRef:  strings.TrimSpace(env.String("AUDIT_EXPORT_WEBHOOK_SECRET_REF", "")),
+		SigningSecretKey:  strings.TrimSpace(env.String("AUDIT_EXPORT_SIGNING_SECRET_KEY", "")),
+		SyslogAddr:        env.String("AUDIT_EXPORT_SYSLOG_ADDR", ""),
+		SyslogProtocol:    env.String("AUDIT_EXPORT_SYSLOG_PROTOCOL", "udp"),
+		SyslogTag:         env.String("AUDIT_EXPORT_SYSLOG_TAG", "animus-audit"),
+		BatchSize:         batchSize,
+		PollInterval:      pollInterval,
+		RetryBaseDelay:    retryBase,
+		RetryMaxDelay:     retryMax,
+		InflightTimeout:   inflightTimeout,
+		HTTPTimeout:       httpTimeout,
+		MaxAttempts:       maxAttempts,
+		WorkerConcurrency: workerConcurrency,
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -92,7 +114,7 @@ func (c Config) Validate() error {
 		if strings.TrimSpace(c.WebhookURL) == "" {
 			return fmt.Errorf("audit export webhook url required")
 		}
-	case "syslog":
+	case "syslog", "syslog_tcp", "syslog_udp":
 		if strings.TrimSpace(c.SyslogAddr) == "" {
 			return fmt.Errorf("audit export syslog addr required")
 		}
@@ -120,6 +142,15 @@ func (c Config) Validate() error {
 	}
 	if c.InflightTimeout <= 0 {
 		return fmt.Errorf("audit export inflight timeout must be positive")
+	}
+	if c.HTTPTimeout <= 0 {
+		return fmt.Errorf("audit export http timeout must be positive")
+	}
+	if c.MaxAttempts <= 0 {
+		return fmt.Errorf("audit export max attempts must be positive")
+	}
+	if c.WorkerConcurrency <= 0 {
+		return fmt.Errorf("audit export worker concurrency must be positive")
 	}
 	return nil
 }

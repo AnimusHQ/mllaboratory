@@ -64,6 +64,10 @@ const (
 	selectAuditExportSinkQuery = `SELECT sink_id, name, destination, format, config, enabled, created_at, updated_at
 		FROM audit_export_sinks
 		WHERE sink_id = $1`
+	listAuditExportSinksQuery = `SELECT sink_id, name, destination, format, config, enabled, created_at, updated_at
+		FROM audit_export_sinks
+		ORDER BY sink_id ASC
+		LIMIT $1`
 
 	markOutboxDeliveredQuery = `UPDATE audit_export_outbox
 		SET status = $1, delivered_at = $2, updated_at = $2, last_error = NULL
@@ -253,4 +257,32 @@ func (s *AuditExportStore) MarkFailed(ctx context.Context, outboxID int64, lastE
 	return nil
 }
 
-var _ auditexport.Store = (*AuditExportStore)(nil)
+func (s *AuditExportStore) ListSinks(ctx context.Context, limit int) ([]auditexport.Sink, error) {
+	if s == nil || s.db == nil {
+		return nil, fmt.Errorf("audit export store not initialized")
+	}
+	if limit <= 0 {
+		limit = 200
+	}
+	rows, err := s.db.QueryContext(ctx, listAuditExportSinksQuery, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make([]auditexport.Sink, 0)
+	for rows.Next() {
+		var record auditexport.Sink
+		if err := rows.Scan(&record.SinkID, &record.Name, &record.Destination, &record.Format, &record.Config, &record.Enabled, &record.CreatedAt, &record.UpdatedAt); err != nil {
+			return nil, err
+		}
+		record.CreatedAt = record.CreatedAt.UTC()
+		record.UpdatedAt = record.UpdatedAt.UTC()
+		out = append(out, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+var _ auditexport.SinkStore = (*AuditExportStore)(nil)

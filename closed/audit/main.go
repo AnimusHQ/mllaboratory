@@ -17,6 +17,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/httpserver"
 	"github.com/animus-labs/animus-go/closed/internal/platform/postgres"
 	"github.com/animus-labs/animus-go/closed/internal/platform/rbac"
+	"github.com/animus-labs/animus-go/closed/internal/platform/secrets"
 	repopg "github.com/animus-labs/animus-go/closed/internal/repo/postgres"
 )
 
@@ -66,8 +67,15 @@ func main() {
 
 	auditAppender := repopg.NewAuditAppender(db, nil)
 	exportStore := repopg.NewAuditExportStore(db)
+	deliveryStore := repopg.NewAuditExportDeliveryStore(db)
+	attemptStore := repopg.NewAuditExportAttemptStore(db)
+	replayStore := repopg.NewAuditExportReplayStore(db)
 	if exportStore == nil {
 		logger.Error("audit export store unavailable")
+		os.Exit(1)
+	}
+	if deliveryStore == nil || attemptStore == nil || replayStore == nil {
+		logger.Error("audit export delivery stores unavailable")
 		os.Exit(1)
 	}
 	if sink, err := auditexport.DefaultSinkFromConfig(exportCfg, time.Now().UTC()); err == nil {
@@ -76,8 +84,8 @@ func main() {
 			os.Exit(1)
 		}
 		if sink.Enabled {
-			if err := exportStore.BackfillOutbox(ctx, sink.SinkID); err != nil {
-				logger.Error("audit export backfill failed", "error", err)
+			if err := deliveryStore.Backfill(ctx, sink.SinkID); err != nil {
+				logger.Error("audit export delivery backfill failed", "error", err)
 				os.Exit(1)
 			}
 		}
@@ -86,7 +94,26 @@ func main() {
 		os.Exit(2)
 	}
 	if exportCfg.Enabled() {
-		worker := auditexport.NewWorker(exportStore, auditAppender, logger, exportCfg)
+		secretsCfg, err := secrets.ConfigFromEnv()
+		if err != nil {
+			logger.Error("invalid secrets config", "error", err)
+			os.Exit(2)
+		}
+		secretsManager, err := secrets.NewManager(secretsCfg)
+		if err != nil {
+			logger.Error("secrets manager unavailable", "error", err)
+			os.Exit(2)
+		}
+		worker := auditexport.NewWorker(
+			deliveryStore,
+			attemptStore,
+			exportStore,
+			exportStore,
+			auditAppender,
+			logger,
+			exportCfg,
+			auditexport.WorkerDeps{Secrets: secretsManager},
+		)
 		go worker.Run(ctx)
 	}
 	authorizer := rbac.Authorizer{
@@ -113,9 +140,10 @@ func main() {
 			},
 		),
 	)
+	httpserver.RegisterMetricsProvider(auditexport.PrometheusMetrics(deliveryStore))
 	httpserver.RegisterMetrics(mux, "audit")
 
-	api := newAuditAPI(logger, db, exportCfg)
+	api := newAuditAPI(logger, db, exportCfg, auditAppender, exportStore, deliveryStore, attemptStore, replayStore)
 	api.register(mux)
 
 	handler := auth.Middleware{

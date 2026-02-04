@@ -68,6 +68,13 @@ const (
 			last_error = $3,
 			updated_at = $4
 		WHERE delivery_id = $5`
+	replayAuditExportDeliveryQuery = `UPDATE audit_export_deliveries
+		SET status = $1,
+			next_attempt_at = $2,
+			last_error = NULL,
+			dlq_reason = NULL,
+			updated_at = $2
+		WHERE delivery_id = $3 AND status = $4`
 	countAuditExportDeliveriesByStatusQuery = `SELECT COUNT(*) FROM audit_export_deliveries WHERE status = $1`
 )
 
@@ -194,6 +201,28 @@ func (s *AuditExportDeliveryStore) MarkDLQ(ctx context.Context, deliveryID int64
 	return nil
 }
 
+func (s *AuditExportDeliveryStore) Replay(ctx context.Context, deliveryID int64, scheduledAt time.Time) error {
+	if s == nil || s.db == nil {
+		return fmt.Errorf("audit export delivery store not initialized")
+	}
+	if deliveryID <= 0 {
+		return fmt.Errorf("delivery_id is required")
+	}
+	at := normalizeTime(scheduledAt)
+	res, err := s.db.ExecContext(ctx, replayAuditExportDeliveryQuery, string(auditexport.DeliveryStatusPending), at, deliveryID, string(auditexport.DeliveryStatusDLQ))
+	if err != nil {
+		return fmt.Errorf("replay audit export delivery: %w", err)
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("replay audit export delivery: %w", err)
+	}
+	if rows == 0 {
+		return fmt.Errorf("delivery not eligible for replay")
+	}
+	return nil
+}
+
 func (s *AuditExportDeliveryStore) Get(ctx context.Context, deliveryID int64) (auditexport.Delivery, error) {
 	if s == nil || s.db == nil {
 		return auditexport.Delivery{}, fmt.Errorf("audit export delivery store not initialized")
@@ -293,3 +322,5 @@ func scanAuditExportDelivery(row auditExportDeliveryScanner) (auditexport.Delive
 	record.NextAttemptAt = record.NextAttemptAt.UTC()
 	return record, nil
 }
+
+var _ auditexport.DeliveryStore = (*AuditExportDeliveryStore)(nil)

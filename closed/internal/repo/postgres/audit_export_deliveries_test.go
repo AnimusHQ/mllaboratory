@@ -25,3 +25,9 @@ func TestAuditExportDeliveriesListFilters(t *testing.T) {
 		t.Fatalf("expected sink_id filter in list query")
 	}
 }
+
+func TestAuditExportDeliveriesReplayUpdatesStatus(t *testing.T) {
+	if !strings.Contains(replayAuditExportDeliveryQuery, "status") {
+		t.Fatalf("expected status clause in replay query")
+	}
+}

@@ -13,19 +13,30 @@ import (
 
 	"github.com/animus-labs/animus-go/closed/internal/auditexport"
 	"github.com/animus-labs/animus-go/closed/internal/domain"
+	"github.com/animus-labs/animus-go/closed/internal/repo"
 )
 
 type auditAPI struct {
-	logger    *slog.Logger
-	db        *sql.DB
-	exportCfg auditexport.Config
+	logger     *slog.Logger
+	db         *sql.DB
+	exportCfg  auditexport.Config
+	audit      repo.AuditEventAppender
+	sinks      auditexport.SinkStore
+	deliveries auditexport.DeliveryStore
+	attempts   auditexport.AttemptStore
+	replays    auditexport.ReplayStore
 }
 
-func newAuditAPI(logger *slog.Logger, db *sql.DB, exportCfg auditexport.Config) *auditAPI {
+func newAuditAPI(logger *slog.Logger, db *sql.DB, exportCfg auditexport.Config, auditAppender repo.AuditEventAppender, sinks auditexport.SinkStore, deliveries auditexport.DeliveryStore, attempts auditexport.AttemptStore, replays auditexport.ReplayStore) *auditAPI {
 	return &auditAPI{
-		logger:    logger,
-		db:        db,
-		exportCfg: exportCfg,
+		logger:     logger,
+		db:         db,
+		exportCfg:  exportCfg,
+		audit:      auditAppender,
+		sinks:      sinks,
+		deliveries: deliveries,
+		attempts:   attempts,
+		replays:    replays,
 	}
 }
 
@@ -33,6 +44,10 @@ func (api *auditAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /events", api.handleListEvents)
 	mux.HandleFunc("GET /events/{event_id}", api.handleGetEvent)
 	mux.HandleFunc("POST /export", api.handleExport)
+	mux.HandleFunc("GET /admin/audit/exports/sinks", api.handleListExportSinks)
+	mux.HandleFunc("GET /admin/audit/exports/deliveries", api.handleListExportDeliveries)
+	mux.HandleFunc("GET /admin/audit/exports/deliveries/{delivery_id}/attempts", api.handleListExportAttempts)
+	mux.HandleFunc("POST /admin/audit/exports/dlq/{delivery_id}:replay", api.handleReplayExportDelivery)
 }
 
 func (api *auditAPI) handleExport(w http.ResponseWriter, r *http.Request) {
@@ -110,6 +125,201 @@ func (api *auditAPI) handleExport(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+type exportSink struct {
+	SinkID      string           `json:"sink_id"`
+	Name        string           `json:"name"`
+	Destination string           `json:"destination"`
+	Format      string           `json:"format"`
+	Enabled     bool             `json:"enabled"`
+	Config      exportSinkConfig `json:"config"`
+	CreatedAt   time.Time        `json:"created_at"`
+	UpdatedAt   time.Time        `json:"updated_at"`
+}
+
+type exportSinkConfig struct {
+	WebhookURL        string `json:"webhook_url,omitempty"`
+	WebhookSecretRef  string `json:"webhook_secret_ref,omitempty"`
+	WebhookSigningKey string `json:"webhook_signing_key,omitempty"`
+	SyslogAddr        string `json:"syslog_addr,omitempty"`
+	SyslogProtocol    string `json:"syslog_protocol,omitempty"`
+	SyslogTag         string `json:"syslog_tag,omitempty"`
+}
+
+type exportDelivery struct {
+	DeliveryID   int64      `json:"delivery_id"`
+	SinkID       string     `json:"sink_id"`
+	EventID      int64      `json:"event_id"`
+	Status       string     `json:"status"`
+	AttemptCount int        `json:"attempt_count"`
+	NextAttempt  time.Time  `json:"next_attempt_at"`
+	LastError    string     `json:"last_error,omitempty"`
+	DLQReason    string     `json:"dlq_reason,omitempty"`
+	DeliveredAt  *time.Time `json:"delivered_at,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type exportAttempt struct {
+	AttemptID   int64     `json:"attempt_id"`
+	DeliveryID  int64     `json:"delivery_id"`
+	AttemptedAt time.Time `json:"attempted_at"`
+	Outcome     string    `json:"outcome"`
+	StatusCode  *int      `json:"status_code,omitempty"`
+	Error       string    `json:"error,omitempty"`
+	LatencyMs   int       `json:"latency_ms,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type replayRequest struct {
+	ReplayToken string `json:"replay_token"`
+}
+
+func (api *auditAPI) handleListExportSinks(w http.ResponseWriter, r *http.Request) {
+	if api == nil || api.sinks == nil {
+		api.writeError(w, r, http.StatusServiceUnavailable, "export_unavailable")
+		return
+	}
+	limit := clampInt(parseIntQuery(r, "limit", 200), 1, 500)
+	records, err := api.sinks.ListSinks(r.Context(), limit)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	out := make([]exportSink, 0, len(records))
+	for _, record := range records {
+		cfg, err := auditexport.DecodeSinkConfig(record)
+		if err != nil {
+			api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+			return
+		}
+		out = append(out, exportSink{
+			SinkID:      record.SinkID,
+			Name:        record.Name,
+			Destination: record.Destination,
+			Format:      record.Format,
+			Enabled:     record.Enabled,
+			Config: exportSinkConfig{
+				WebhookURL:        cfg.WebhookURL,
+				WebhookSecretRef:  cfg.WebhookSecretRef,
+				WebhookSigningKey: cfg.WebhookSigningKey,
+				SyslogAddr:        cfg.SyslogAddr,
+				SyslogProtocol:    cfg.SyslogProtocol,
+				SyslogTag:         cfg.SyslogTag,
+			},
+			CreatedAt: record.CreatedAt.UTC(),
+			UpdatedAt: record.UpdatedAt.UTC(),
+		})
+	}
+	api.auditExportAccess(r.Context(), "audit.export.read", "sinks", domain.Metadata{"count": len(out)})
+	api.writeJSON(w, http.StatusOK, map[string]any{"sinks": out})
+}
+
+func (api *auditAPI) handleListExportDeliveries(w http.ResponseWriter, r *http.Request) {
+	if api == nil || api.deliveries == nil {
+		api.writeError(w, r, http.StatusServiceUnavailable, "export_unavailable")
+		return
+	}
+	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	sinkID := strings.TrimSpace(r.URL.Query().Get("sink_id"))
+	limit := clampInt(parseIntQuery(r, "limit", 200), 1, 500)
+	records, err := api.deliveries.List(r.Context(), status, sinkID, limit)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	out := make([]exportDelivery, 0, len(records))
+	for _, record := range records {
+		out = append(out, exportDelivery{
+			DeliveryID:   record.DeliveryID,
+			SinkID:       record.SinkID,
+			EventID:      record.EventID,
+			Status:       string(record.Status),
+			AttemptCount: record.AttemptCount,
+			NextAttempt:  record.NextAttemptAt.UTC(),
+			LastError:    record.LastError,
+			DLQReason:    record.DLQReason,
+			DeliveredAt:  record.DeliveredAt,
+			CreatedAt:    record.CreatedAt.UTC(),
+			UpdatedAt:    record.UpdatedAt.UTC(),
+		})
+	}
+	api.auditExportAccess(r.Context(), "audit.export.read", "deliveries", domain.Metadata{"count": len(out)})
+	api.writeJSON(w, http.StatusOK, map[string]any{"deliveries": out})
+}
+
+func (api *auditAPI) handleListExportAttempts(w http.ResponseWriter, r *http.Request) {
+	if api == nil || api.attempts == nil {
+		api.writeError(w, r, http.StatusServiceUnavailable, "export_unavailable")
+		return
+	}
+	idStr := strings.TrimSpace(r.PathValue("delivery_id"))
+	deliveryID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || deliveryID <= 0 {
+		api.writeError(w, r, http.StatusBadRequest, "invalid_delivery_id")
+		return
+	}
+	limit := clampInt(parseIntQuery(r, "limit", 200), 1, 500)
+	records, err := api.attempts.List(r.Context(), deliveryID, limit)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	out := make([]exportAttempt, 0, len(records))
+	for _, record := range records {
+		out = append(out, exportAttempt{
+			AttemptID:   record.AttemptID,
+			DeliveryID:  record.DeliveryID,
+			AttemptedAt: record.AttemptedAt.UTC(),
+			Outcome:     string(record.Outcome),
+			StatusCode:  record.StatusCode,
+			Error:       record.Error,
+			LatencyMs:   record.LatencyMs,
+			CreatedAt:   record.CreatedAt.UTC(),
+		})
+	}
+	api.auditExportAccess(r.Context(), "audit.export.read", fmt.Sprintf("delivery:%d", deliveryID), domain.Metadata{"attempts": len(out)})
+	api.writeJSON(w, http.StatusOK, map[string]any{"attempts": out})
+}
+
+func (api *auditAPI) handleReplayExportDelivery(w http.ResponseWriter, r *http.Request) {
+	if api == nil || api.replays == nil || api.deliveries == nil {
+		api.writeError(w, r, http.StatusServiceUnavailable, "export_unavailable")
+		return
+	}
+	idStr := strings.TrimSpace(r.PathValue("delivery_id"))
+	deliveryID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil || deliveryID <= 0 {
+		api.writeError(w, r, http.StatusBadRequest, "invalid_delivery_id")
+		return
+	}
+	token := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if token == "" && r.ContentLength != 0 {
+		var req replayRequest
+		if err := decodeJSON(r, &req); err != nil {
+			api.writeError(w, r, http.StatusBadRequest, "invalid_json")
+			return
+		}
+		token = strings.TrimSpace(req.ReplayToken)
+	}
+	if token == "" {
+		api.writeError(w, r, http.StatusBadRequest, "replay_token_required")
+		return
+	}
+	inserted, err := api.replays.Insert(r.Context(), deliveryID, token, time.Now().UTC())
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if inserted {
+		if err := api.deliveries.Replay(r.Context(), deliveryID, time.Now().UTC()); err != nil {
+			api.writeError(w, r, http.StatusConflict, "delivery_not_in_dlq")
+			return
+		}
+	}
+	api.auditExportAccess(r.Context(), "audit.export.replay_requested", fmt.Sprintf("delivery:%d", deliveryID), domain.Metadata{"delivery_id": deliveryID})
+	api.writeJSON(w, http.StatusAccepted, map[string]any{"status": "replay_scheduled"})
 }
 
 type auditEvent struct {
@@ -290,6 +500,27 @@ func (api *auditAPI) writeJSON(w http.ResponseWriter, status int, body any) {
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(true)
 	_ = enc.Encode(body)
+}
+
+func (api *auditAPI) auditExportAccess(ctx context.Context, action string, resourceID string, payload domain.Metadata) {
+	if api == nil || api.audit == nil {
+		return
+	}
+	action = strings.TrimSpace(action)
+	if action == "" {
+		return
+	}
+	if payload == nil {
+		payload = domain.Metadata{}
+	}
+	_, _ = api.audit.Append(ctx, domain.AuditEvent{
+		OccurredAt:   time.Now().UTC(),
+		Actor:        "system:audit-api",
+		Action:       action,
+		ResourceType: "audit_export",
+		ResourceID:   strings.TrimSpace(resourceID),
+		Payload:      payload,
+	})
 }
 
 func (api *auditAPI) writeError(w http.ResponseWriter, r *http.Request, status int, code string) {

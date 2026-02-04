@@ -149,3 +149,5 @@ func nullableInt(value int) sql.NullInt64 {
 	}
 	return sql.NullInt64{Int64: int64(value), Valid: true}
 }
+
+var _ auditexport.AttemptStore = (*AuditExportAttemptStore)(nil)

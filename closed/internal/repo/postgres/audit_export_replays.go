@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"github.com/animus-labs/animus-go/closed/internal/auditexport"
 )
 
 type AuditExportReplayStore struct {
@@ -48,3 +50,5 @@ func (s *AuditExportReplayStore) Insert(ctx context.Context, deliveryID int64, t
 	rows, _ := res.RowsAffected()
 	return rows > 0, nil
 }
+
+var _ auditexport.ReplayStore = (*AuditExportReplayStore)(nil)
