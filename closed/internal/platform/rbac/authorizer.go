@@ -26,15 +26,20 @@ func (a Authorizer) Authorize(r *http.Request, identity auth.Identity) error {
 	if r == nil {
 		return auth.ErrForbidden
 	}
-	if IsRunToken(identity) {
-		return nil
-	}
-
 	required := RequiredRoleFromRequest(r)
 	if a.RequiredRoleFor != nil {
 		required = a.RequiredRoleFor(r)
 	}
 	if strings.TrimSpace(required) == "" {
+		return nil
+	}
+
+	if IsRunToken(identity) {
+		if strings.EqualFold(required, auth.RoleAdmin) {
+			projectID := projectFromRequest(r)
+			auditAccessDenied(r.Context(), a.Audit, r, identity, projectID, "", required, a.Now)
+			return auth.ErrForbidden
+		}
 		return nil
 	}
 

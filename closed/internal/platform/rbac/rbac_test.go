@@ -58,6 +58,19 @@ func TestAuthorizerBypassesRunToken(t *testing.T) {
 	}
 }
 
+func TestAuthorizerBlocksRunTokenForAdmin(t *testing.T) {
+	authorizer := Authorizer{
+		RequiredRoleFor: func(r *http.Request) string {
+			return auth.RoleAdmin
+		},
+	}
+	req := httptest.NewRequest(http.MethodPost, "http://example.test/admin", nil)
+
+	if err := authorizer.Authorize(req, auth.Identity{Subject: "run:run-123"}); err == nil {
+		t.Fatalf("expected admin to be blocked for run token")
+	}
+}
+
 func TestResolveRolePrefersBindingsWhenDirectDisabled(t *testing.T) {
 	store := stubBindingStore{bindings: []repo.RoleBindingRecord{{Role: auth.RoleAdmin}}}
 	role, _, err := ResolveRole(context.Background(), store, "proj-1", auth.Identity{Subject: "user-1", Roles: []string{auth.RoleViewer}}, false)
