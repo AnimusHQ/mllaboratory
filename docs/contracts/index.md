@@ -53,6 +53,14 @@
 - Аппрув/депрекейт требуют админ‑ролей; валидация доступна editor.
 - Экспорт версии разрешён только для `approved`; операции идемпотентны по `Idempotency-Key` и аудируются.
 
+### 1.8 Целостность образов и подписи реестра (P5)
+- Enforcement: создание EnvironmentLock (ADR‑0012), CP не исполняет пользовательский код.
+- Политики: `allow_unsigned` | `verify_only` | `deny_unsigned`.
+- Результаты проверки сохраняются в `image_verifications` (project‑scoped) с уникальностью `(project_id, image_digest_ref, policy_mode, provider)`.
+- Проектные переопределения политики хранятся в `registry_policies` (без API управления в v1.1).
+- API (read‑only): `GET /projects/{project_id}/registry/verifications`.
+- Аудит: `image.verification.requested`, `image.verified`, `image.verification_failed`, `environment.lock.creation_blocked`.
+
 ## 2. Контракт CP↔DP (Data Plane протокол)
 ### 2.1 Текущий статус
 - Транспорт: **HTTP + OpenAPI**, контракт зафиксирован в `open/api/openapi/dataplane_internal.yaml` (ADR‑0007).
