@@ -30,6 +30,13 @@ secrets:
   provider: noop
   leaseTTLSeconds: 600
   staticJSON: ""
+  vault:
+    addr: ""
+    role: ""
+    authPath: "auth/kubernetes/login"
+    jwtPath: ""
+    namespace: ""
+    timeout: "5s"
 
 observability:
   metrics:

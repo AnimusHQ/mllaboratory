@@ -50,3 +50,17 @@ func TestRedactJSON(t *testing.T) {
 		t.Fatalf("expected redacted token in output: %s", out)
 	}
 }
+
+func TestRedactMapString(t *testing.T) {
+	input := map[string]string{
+		"api_key": "abc123",
+		"safe":    "Bearer token-value",
+	}
+	out := RedactMapString(input)
+	if out["api_key"] != "[REDACTED]" {
+		t.Fatalf("expected api_key redacted")
+	}
+	if out["safe"] != "[REDACTED]" {
+		t.Fatalf("expected value pattern redacted")
+	}
+}

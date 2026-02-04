@@ -74,7 +74,19 @@
       "properties": {
         "provider": {"type": "string"},
         "leaseTTLSeconds": {"type": "integer", "minimum": 1},
-        "staticJSON": {"type": "string"}
+        "staticJSON": {"type": "string"},
+        "vault": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "addr": {"type": "string"},
+            "role": {"type": "string"},
+            "authPath": {"type": "string"},
+            "jwtPath": {"type": "string"},
+            "namespace": {"type": "string"},
+            "timeout": {"type": "string"}
+          }
+        }
       }
     },
     "observability": {
