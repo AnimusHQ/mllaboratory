@@ -326,6 +326,11 @@ func (api *experimentsAPI) handleDPTerminal(w http.ResponseWriter, r *http.Reque
 		api.writeError(w, r, http.StatusConflict, "invalid_transition")
 		return
 	}
+	if applied {
+		if err := api.enqueueWebhookRunFinished(r.Context(), identity.Subject, r.Header.Get("X-Request-Id"), projectID, runID, req.EmittedAt); err != nil && api.logger != nil {
+			api.logger.Warn("webhook enqueue failed", "project_id", projectID, "run_id", runID, "event_id", req.EventID, "error", err)
+		}
+	}
 
 	api.writeJSON(w, http.StatusOK, dataplane.RunTerminalResponse{
 		Accepted:  !duplicate,

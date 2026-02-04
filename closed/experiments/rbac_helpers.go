@@ -17,6 +17,8 @@ func experimentsRequiredRole(r *http.Request) string {
 		return auth.RoleAdmin
 	case strings.Contains(path, "/role-bindings"):
 		return auth.RoleAdmin
+	case strings.Contains(path, "/webhooks"):
+		return auth.RoleAdmin
 	}
 	return rbac.RequiredRoleFromRequest(r)
 }

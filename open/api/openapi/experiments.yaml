@@ -2879,6 +2879,327 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/subscriptions:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Создать webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionCreateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: Список webhook-подписок
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/subscriptions/{subscription_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: subscription_id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      summary: Обновить webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Обновить webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список доставок webhook
+      parameters:
+        - name: event_type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WebhookEventType"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WebhookDeliveryStatus"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries/{delivery_id}/attempts:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Попытки доставки webhook
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryAttemptListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries/{delivery_id}:replay:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Повторить доставку webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookDeliveryReplayRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryReplayResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /projects/{project_id}/environment-locks/{lock_id}:
     parameters:
       - name: project_id
@@ -4118,6 +4439,212 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ImageVerificationRecord"
+    WebhookEventType:
+      type: string
+      enum: [RunFinished, ModelApproved, DatasetVersionCreated]
+    WebhookDeliveryStatus:
+      type: string
+      enum: [PENDING, DELIVERED, FAILED, DISABLED]
+    WebhookEventSubject:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id:
+          type: string
+        model_version_id:
+          type: string
+        dataset_version_id:
+          type: string
+    WebhookEventPayload:
+      type: object
+      additionalProperties: false
+      required: [event_id, event_type, emitted_at, project_id, subject]
+      properties:
+        event_id:
+          type: string
+        event_type:
+          $ref: "#/components/schemas/WebhookEventType"
+        emitted_at:
+          type: string
+          format: date-time
+        project_id:
+          type: string
+        subject:
+          $ref: "#/components/schemas/WebhookEventSubject"
+        api_links:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, target_url, event_types]
+      properties:
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionResponse:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, name, target_url, enabled, event_types, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookSubscriptionListResponse:
+      type: object
+      additionalProperties: false
+      required: [subscriptions]
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookSubscriptionResponse"
+    WebhookDelivery:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, subscription_id, event_id, event_type, status, next_attempt_at, attempt_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        subscription_id:
+          type: string
+        event_id:
+          type: string
+        event_type:
+          $ref: "#/components/schemas/WebhookEventType"
+        status:
+          $ref: "#/components/schemas/WebhookDeliveryStatus"
+        next_attempt_at:
+          type: string
+          format: date-time
+        attempt_count:
+          type: integer
+        last_error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookDeliveryListResponse:
+      type: object
+      additionalProperties: false
+      required: [deliveries]
+      properties:
+        deliveries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDelivery"
+    WebhookDeliveryAttempt:
+      type: object
+      additionalProperties: false
+      required: [id, delivery_id, attempted_at, outcome, created_at]
+      properties:
+        id:
+          type: integer
+        delivery_id:
+          type: string
+        attempted_at:
+          type: string
+          format: date-time
+        status_code:
+          type: integer
+        outcome:
+          type: string
+        error:
+          type: string
+        latency_ms:
+          type: integer
+        request_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    WebhookDeliveryAttemptListResponse:
+      type: object
+      additionalProperties: false
+      required: [attempts]
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDeliveryAttempt"
+    WebhookDeliveryReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [replay_token]
+      properties:
+        replay_token:
+          type: string
+    WebhookDeliveryReplayResponse:
+      type: object
+      additionalProperties: false
+      required: [delivery_id, scheduled]
+      properties:
+        delivery_id:
+          type: string
+        scheduled:
+          type: boolean
     ProjectRunGetResponse:
       type: object
       additionalProperties: false

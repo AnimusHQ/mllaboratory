@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/animus-labs/animus-go/closed/internal/integrations/webhooks"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auditlog"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/env"
@@ -19,6 +20,7 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/objectstore"
 	"github.com/animus-labs/animus-go/closed/internal/platform/postgres"
 	"github.com/animus-labs/animus-go/closed/internal/platform/rbac"
+	"github.com/animus-labs/animus-go/closed/internal/platform/secrets"
 	repopg "github.com/animus-labs/animus-go/closed/internal/repo/postgres"
 	"github.com/animus-labs/animus-go/closed/internal/runtimeexec"
 )
@@ -96,6 +98,23 @@ func main() {
 	}
 
 	gitlabWebhookSecret := strings.TrimSpace(env.String("ANIMUS_GITLAB_WEBHOOK_SECRET", ""))
+
+	webhookCfg, err := webhooks.ConfigFromEnv()
+	if err != nil {
+		logger.Error("invalid webhook config", "error", err)
+		os.Exit(2)
+	}
+
+	secretsCfg, err := secrets.ConfigFromEnv()
+	if err != nil {
+		logger.Error("invalid secrets config", "error", err)
+		os.Exit(2)
+	}
+	secretsManager, err := secrets.NewManager(secretsCfg)
+	if err != nil {
+		logger.Error("invalid secrets manager", "error", err)
+		os.Exit(2)
+	}
 
 	runTokenTTL, err := env.Duration("ANIMUS_RUN_TOKEN_TTL", 12*time.Hour)
 	if err != nil {
@@ -227,6 +246,7 @@ func main() {
 		gitlabWebhookSecret,
 		trainingExec,
 		trainingNamespace,
+		webhookCfg,
 	)
 	api.register(mux)
 
@@ -241,10 +261,20 @@ func main() {
 		DatapilotURL:          datapilotURL,
 	})
 	startDPReconciler(ctx, logger, db, dataplaneURL, internalAuthSecret, dpReconcileInterval, dpHeartbeatStaleAfter)
+	webhookWorker := webhooks.NewWorker(
+		repopg.NewWebhookSubscriptionStore(db),
+		repopg.NewWebhookDeliveryStore(db),
+		repopg.NewWebhookDeliveryAttemptStore(db),
+		secretsManager,
+		auditAppender,
+		logger,
+		webhookCfg,
+	)
+	startWebhookDispatcher(ctx, logger, webhookWorker)
 
 	handler := auth.Middleware{
-		Logger:        logger,
-		Authenticator: headersAuth,
+		Logger:         logger,
+		Authenticator:  headersAuth,
 		Authorize:      authorizer.Authorize,
 		ProjectResolve: experimentsProjectResolver(db),
 		Audit: func(ctx context.Context, event auth.DenyEvent) error {

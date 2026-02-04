@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/animus-labs/animus-go/closed/internal/domain"
 	"github.com/animus-labs/animus-go/closed/internal/platform/redaction"
 	"github.com/animus-labs/animus-go/closed/internal/platform/secrets"
 	"github.com/animus-labs/animus-go/closed/internal/repo"
@@ -27,13 +28,14 @@ type Worker struct {
 	deliveries    DeliveryStore
 	attempts      AttemptStore
 	secrets       secrets.Manager
+	audit         repo.AuditEventAppender
 	logger        Logger
 	cfg           Config
 	now           func() time.Time
 	client        *http.Client
 }
 
-func NewWorker(subscriptions SubscriptionStore, deliveries DeliveryStore, attempts AttemptStore, secretsManager secrets.Manager, logger Logger, cfg Config) *Worker {
+func NewWorker(subscriptions SubscriptionStore, deliveries DeliveryStore, attempts AttemptStore, secretsManager secrets.Manager, audit repo.AuditEventAppender, logger Logger, cfg Config) *Worker {
 	clientTimeout := cfg.HTTPTimeout
 	if clientTimeout <= 0 {
 		clientTimeout = 10 * time.Second
@@ -43,6 +45,7 @@ func NewWorker(subscriptions SubscriptionStore, deliveries DeliveryStore, attemp
 		deliveries:    deliveries,
 		attempts:      attempts,
 		secrets:       secretsManager,
+		audit:         audit,
 		logger:        logger,
 		cfg:           cfg,
 		now:           time.Now,
@@ -118,8 +121,9 @@ func (w *Worker) processDelivery(ctx context.Context, delivery Delivery) {
 		maxAttempts = 10
 	}
 	if attemptNumber > maxAttempts {
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomePermanentFailure, nil, "max attempts exceeded", 0, "")
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomePermanentFailure, nil, "max attempts exceeded", 0, "")
 		w.updateDelivery(ctx, delivery, DeliveryStatusFailed, now, attemptNumber, "max attempts exceeded")
+		w.auditFailed(ctx, delivery, attemptNumber, nil, "max attempts exceeded")
 		return
 	}
 
@@ -127,18 +131,20 @@ func (w *Worker) processDelivery(ctx context.Context, delivery Delivery) {
 	if err != nil {
 		if errors.Is(err, repo.ErrNotFound) {
 			reason := "subscription not found"
-			w.recordAttempt(ctx, delivery, now, AttemptOutcomePermanentFailure, nil, reason, 0, "")
+			w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomePermanentFailure, nil, reason, 0, "")
 			w.updateDelivery(ctx, delivery, DeliveryStatusDisabled, now, attemptNumber, reason)
+			w.auditFailed(ctx, delivery, attemptNumber, nil, reason)
 			return
 		}
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomeRetry, nil, err.Error(), 0, "")
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomeRetry, nil, err.Error(), 0, "")
 		w.scheduleRetry(ctx, delivery, now, attemptNumber, err)
 		return
 	}
 	if !subscription.Enabled {
 		reason := "subscription disabled"
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomePermanentFailure, nil, reason, 0, "")
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomePermanentFailure, nil, reason, 0, "")
 		w.updateDelivery(ctx, delivery, DeliveryStatusDisabled, now, attemptNumber, reason)
+		w.auditFailed(ctx, delivery, attemptNumber, nil, reason)
 		return
 	}
 
@@ -150,11 +156,12 @@ func (w *Worker) processDelivery(ctx context.Context, delivery Delivery) {
 	req, err := w.buildRequest(ctx, delivery, subscription, payload)
 	if err != nil {
 		if isPermanentBuildError(err) {
-			w.recordAttempt(ctx, delivery, now, AttemptOutcomePermanentFailure, nil, err.Error(), 0, "")
+			w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomePermanentFailure, nil, err.Error(), 0, "")
 			w.updateDelivery(ctx, delivery, DeliveryStatusFailed, now, attemptNumber, err.Error())
+			w.auditFailed(ctx, delivery, attemptNumber, nil, err.Error())
 			return
 		}
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomeRetry, nil, err.Error(), 0, "")
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomeRetry, nil, err.Error(), 0, "")
 		w.scheduleRetry(ctx, delivery, now, attemptNumber, err)
 		return
 	}
@@ -170,26 +177,28 @@ func (w *Worker) processDelivery(ctx context.Context, delivery Delivery) {
 	statusCode := responseStatusCode(resp)
 	requestID := responseRequestID(resp)
 	if reqErr != nil {
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomeRetry, statusCode, reqErr.Error(), latency, requestID)
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomeRetry, statusCode, reqErr.Error(), latency, requestID)
 		w.scheduleRetry(ctx, delivery, now, attemptNumber, reqErr)
 		return
 	}
 
 	outcome, terminal := classifyOutcome(statusCode)
 	if outcome == AttemptOutcomeSuccess {
-		w.recordAttempt(ctx, delivery, now, outcome, statusCode, "", latency, requestID)
+		w.recordAttempt(ctx, delivery, now, attemptNumber, outcome, statusCode, "", latency, requestID)
 		w.updateDelivery(ctx, delivery, DeliveryStatusDelivered, now, attemptNumber, "")
+		w.auditDelivered(ctx, delivery, attemptNumber, statusCode)
 		return
 	}
 	if terminal {
 		errMsg := fmt.Sprintf("response status %d", statusCode)
-		w.recordAttempt(ctx, delivery, now, AttemptOutcomePermanentFailure, statusCode, errMsg, latency, requestID)
+		w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomePermanentFailure, statusCode, errMsg, latency, requestID)
 		w.updateDelivery(ctx, delivery, DeliveryStatusFailed, now, attemptNumber, errMsg)
+		w.auditFailed(ctx, delivery, attemptNumber, statusCode, errMsg)
 		return
 	}
 
 	errMsg := fmt.Sprintf("response status %d", statusCode)
-	w.recordAttempt(ctx, delivery, now, AttemptOutcomeRetry, statusCode, errMsg, latency, requestID)
+	w.recordAttempt(ctx, delivery, now, attemptNumber, AttemptOutcomeRetry, statusCode, errMsg, latency, requestID)
 	w.scheduleRetry(ctx, delivery, now, attemptNumber, fmt.Errorf("status %d", statusCode))
 }
 
@@ -255,7 +264,7 @@ func (w *Worker) resolveSigningSecret(ctx context.Context, projectID, classRef s
 	return value, nil
 }
 
-func (w *Worker) recordAttempt(ctx context.Context, delivery Delivery, attemptedAt time.Time, outcome AttemptOutcome, statusCode *int, errMsg string, latency time.Duration, requestID string) {
+func (w *Worker) recordAttempt(ctx context.Context, delivery Delivery, attemptedAt time.Time, attemptNumber int, outcome AttemptOutcome, statusCode *int, errMsg string, latency time.Duration, requestID string) {
 	if w == nil || w.attempts == nil {
 		return
 	}
@@ -272,6 +281,7 @@ func (w *Worker) recordAttempt(ctx context.Context, delivery Delivery, attempted
 	if _, err := w.attempts.Insert(ctx, attempt); err != nil {
 		w.logWarn("webhook attempt insert failed", "delivery_id", delivery.ID, "project_id", delivery.ProjectID, "event_id", delivery.EventID, "error", err)
 	}
+	w.auditAttempt(ctx, delivery, attemptNumber, outcome, statusCode, errMsg)
 }
 
 func (w *Worker) updateDelivery(ctx context.Context, delivery Delivery, status DeliveryStatus, now time.Time, attemptCount int, errMsg string) {
@@ -309,6 +319,75 @@ func (w *Worker) logWarn(msg string, args ...any) {
 	}
 }
 
+func (w *Worker) auditAttempt(ctx context.Context, delivery Delivery, attemptNumber int, outcome AttemptOutcome, statusCode *int, errMsg string) {
+	if w == nil || w.audit == nil {
+		return
+	}
+	payload := domain.Metadata{
+		"project_id":      delivery.ProjectID,
+		"subscription_id": delivery.SubscriptionID,
+		"event_id":        delivery.EventID,
+		"event_type":      delivery.EventType.String(),
+		"attempt":         attemptNumber,
+		"outcome":         string(outcome),
+		"status_code":     statusCodeValue(statusCode),
+		"error":           sanitizeError(errMsg),
+	}
+	_, _ = w.audit.Append(ctx, domain.AuditEvent{
+		OccurredAt:   w.now().UTC(),
+		Actor:        "system:webhook-dispatcher",
+		Action:       "webhook.delivery.attempted",
+		ResourceType: "webhook_delivery",
+		ResourceID:   delivery.ID,
+		Payload:      payload,
+	})
+}
+
+func (w *Worker) auditDelivered(ctx context.Context, delivery Delivery, attemptNumber int, statusCode *int) {
+	if w == nil || w.audit == nil {
+		return
+	}
+	payload := domain.Metadata{
+		"project_id":      delivery.ProjectID,
+		"subscription_id": delivery.SubscriptionID,
+		"event_id":        delivery.EventID,
+		"event_type":      delivery.EventType.String(),
+		"attempt":         attemptNumber,
+		"status_code":     statusCodeValue(statusCode),
+	}
+	_, _ = w.audit.Append(ctx, domain.AuditEvent{
+		OccurredAt:   w.now().UTC(),
+		Actor:        "system:webhook-dispatcher",
+		Action:       "webhook.delivery.delivered",
+		ResourceType: "webhook_delivery",
+		ResourceID:   delivery.ID,
+		Payload:      payload,
+	})
+}
+
+func (w *Worker) auditFailed(ctx context.Context, delivery Delivery, attemptNumber int, statusCode *int, errMsg string) {
+	if w == nil || w.audit == nil {
+		return
+	}
+	payload := domain.Metadata{
+		"project_id":      delivery.ProjectID,
+		"subscription_id": delivery.SubscriptionID,
+		"event_id":        delivery.EventID,
+		"event_type":      delivery.EventType.String(),
+		"attempt":         attemptNumber,
+		"status_code":     statusCodeValue(statusCode),
+		"error":           sanitizeError(errMsg),
+	}
+	_, _ = w.audit.Append(ctx, domain.AuditEvent{
+		OccurredAt:   w.now().UTC(),
+		Actor:        "system:webhook-dispatcher",
+		Action:       "webhook.delivery.failed",
+		ResourceType: "webhook_delivery",
+		ResourceID:   delivery.ID,
+		Payload:      payload,
+	})
+}
+
 func sanitizeError(msg string) string {
 	clean := redaction.RedactString(strings.TrimSpace(msg))
 	if len(clean) > 500 {
@@ -323,6 +402,13 @@ func responseStatusCode(resp *http.Response) *int {
 	}
 	code := resp.StatusCode
 	return &code
+}
+
+func statusCodeValue(code *int) any {
+	if code == nil {
+		return nil
+	}
+	return *code
 }
 
 func responseRequestID(resp *http.Response) string {

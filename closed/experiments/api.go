@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/animus-labs/animus-go/closed/internal/integrations/webhooks"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auditlog"
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/lineageevent"
@@ -43,6 +44,8 @@ type experimentsAPI struct {
 
 	trainingExecutor  trainingExecutor
 	trainingNamespace string
+
+	webhookConfig webhooks.Config
 }
 
 func newExperimentsAPI(
@@ -59,6 +62,7 @@ func newExperimentsAPI(
 	gitlabWebhookSecret string,
 	trainingExecutor trainingExecutor,
 	trainingNamespace string,
+	webhookConfig webhooks.Config,
 ) *experimentsAPI {
 	return &experimentsAPI{
 		logger:                logger,
@@ -75,6 +79,7 @@ func newExperimentsAPI(
 		gitlabWebhookSecret:   strings.TrimSpace(gitlabWebhookSecret),
 		trainingExecutor:      trainingExecutor,
 		trainingNamespace:     strings.TrimSpace(trainingNamespace),
+		webhookConfig:         webhookConfig,
 	}
 }
 
@@ -104,6 +109,13 @@ func (api *experimentsAPI) register(mux *http.ServeMux) {
 	mux.HandleFunc("POST /projects/{project_id}/environment-locks", api.handleCreateEnvironmentLock)
 	mux.HandleFunc("GET /projects/{project_id}/environment-locks", api.handleListEnvironmentLocks)
 	mux.HandleFunc("GET /projects/{project_id}/environment-locks/{lock_id}", api.handleGetEnvironmentLock)
+	mux.HandleFunc("POST /projects/{project_id}/webhooks/subscriptions", api.handleCreateWebhookSubscription)
+	mux.HandleFunc("GET /projects/{project_id}/webhooks/subscriptions", api.handleListWebhookSubscriptions)
+	mux.HandleFunc("PATCH /projects/{project_id}/webhooks/subscriptions/{subscription_id}", api.handleUpdateWebhookSubscription)
+	mux.HandleFunc("PUT /projects/{project_id}/webhooks/subscriptions/{subscription_id}", api.handleUpdateWebhookSubscription)
+	mux.HandleFunc("GET /projects/{project_id}/webhooks/deliveries", api.handleListWebhookDeliveries)
+	mux.HandleFunc("GET /projects/{project_id}/webhooks/deliveries/{delivery_id}/attempts", api.handleListWebhookDeliveryAttempts)
+	mux.HandleFunc("POST /projects/{project_id}/webhooks/deliveries/{delivery_id}:replay", api.handleReplayWebhookDelivery)
 
 	mux.HandleFunc("GET /experiments/{experiment_id}/runs", api.handleListExperimentRuns)
 	mux.HandleFunc("POST /experiments/{experiment_id}/runs", api.handleCreateExperimentRun)
