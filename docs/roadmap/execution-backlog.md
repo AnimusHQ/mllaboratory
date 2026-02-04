@@ -1996,3 +1996,9 @@
 - air‑gapped: `closed/scripts/airgap-bundle.sh --output ./bundle --values values-control-plane.yaml --values values-data-plane.yaml`
 - HA/DR: пройти `docs/ops/backup-restore.md` и чек‑лист `docs/ops/dr-game-day.md`, зафиксировать RPO/RTO
 - упаковка: `helm upgrade --install ...`, `helm test animus-cp`, `helm test animus-dp`
+
+### V1.1 (P5): проверка
+- команды: `make integrations-test`, `make openapi-lint`, `./scripts/go_test.sh ./closed/...`
+- SCM: прогон unit‑тестов с mock‑провайдером; проверка allowlist и блокировки диспетча.
+- вебхуки: симуляция получателя (HTTP 500/429 → ретраи, HTTP 200 → delivered), проверка идемпотентности по `event_id`.
+- observability: наличие метрик `animus_webhook_*` на `/metrics` и аудит `webhook.delivery.*`.

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/animus-labs/animus-go/closed/internal/integrations/webhooks"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type WebhookSubscriptionStore struct {
@@ -242,34 +241,27 @@ func sortEventTypes(input []webhooks.EventType) {
 	sort.Slice(input, func(i, j int) bool { return input[i] < input[j] })
 }
 
-func encodeEventTypes(input []webhooks.EventType) pgtype.TextArray {
-	elements := make([]pgtype.Text, 0, len(input))
+func encodeEventTypes(input []webhooks.EventType) []string {
+	out := make([]string, 0, len(input))
 	for _, value := range input {
 		if !value.Valid() {
 			continue
 		}
-		elements = append(elements, pgtype.Text{String: value.String(), Valid: true})
+		out = append(out, value.String())
 	}
-	if len(elements) == 0 {
-		return pgtype.TextArray{}
-	}
-	return pgtype.TextArray{
-		Elements:   elements,
-		Dimensions: []pgtype.ArrayDimension{{Length: int32(len(elements)), LowerBound: 1}},
-		Valid:      true,
-	}
-}
-
-func decodeEventTypes(arr pgtype.TextArray) []webhooks.EventType {
-	if !arr.Valid || len(arr.Elements) == 0 {
+	if len(out) == 0 {
 		return nil
 	}
-	out := make([]webhooks.EventType, 0, len(arr.Elements))
-	for _, elem := range arr.Elements {
-		if !elem.Valid {
-			continue
-		}
-		et := webhooks.EventType(strings.TrimSpace(elem.String))
+	return out
+}
+
+func decodeEventTypes(arr []string) []webhooks.EventType {
+	if len(arr) == 0 {
+		return nil
+	}
+	out := make([]webhooks.EventType, 0, len(arr))
+	for _, elem := range arr {
+		et := webhooks.EventType(strings.TrimSpace(elem))
 		if !et.Valid() {
 			continue
 		}
@@ -307,7 +299,7 @@ type rowScanner interface {
 func scanWebhookSubscription(row rowScanner) (webhooks.Subscription, error) {
 	var (
 		record     webhooks.Subscription
-		eventTypes pgtype.TextArray
+		eventTypes []string
 		secretRef  sql.NullString
 		headersRaw []byte
 		createdAt  time.Time

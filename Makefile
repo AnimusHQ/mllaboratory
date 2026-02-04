@@ -18,7 +18,7 @@ export GOCACHE := $(CACHE_DIR)/go-build
 export GOMODCACHE := $(CACHE_DIR)/go-mod
 export GOTMPDIR := $(CACHE_DIR)/go-tmp
 
-.PHONY: bootstrap fmt test lint build openapi-lint dev demo demo-smoke demo-down e2e sbom vuln-scan supply-chain helm-images
+.PHONY: bootstrap fmt test integrations-test lint build openapi-lint dev demo demo-smoke demo-down e2e sbom vuln-scan supply-chain helm-images
 
 bootstrap:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"
@@ -79,6 +79,10 @@ test:
 		fi; \
 	fi
 	@PYTHONPATH="$(PY_SDK_DIR)/src" $(PY) -m unittest discover -s "$(PY_SDK_DIR)/tests" -p 'test_*.py'
+
+integrations-test:
+	@./scripts/go_test.sh ./closed/...
+
 
 build:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"

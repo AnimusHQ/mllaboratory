@@ -200,6 +200,7 @@ func main() {
 			},
 		),
 	)
+	httpserver.RegisterMetricsProvider(webhooks.PrometheusMetrics)
 	httpserver.RegisterMetrics(mux, "experiments")
 
 	datapilotURL := env.String("ANIMUS_DATAPILOT_URL", "http://localhost:8080")

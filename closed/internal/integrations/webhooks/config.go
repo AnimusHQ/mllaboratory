@@ -9,7 +9,7 @@ import (
 )
 
 type Config struct {
-	Enabled           bool
+	EnabledFlag       bool
 	BatchSize         int
 	PollInterval      time.Duration
 	RetryBaseDelay    time.Duration
@@ -61,7 +61,7 @@ func ConfigFromEnv() (Config, error) {
 	secretKey := strings.TrimSpace(env.String("ANIMUS_WEBHOOK_SIGNING_SECRET_KEY", "WEBHOOK_SIGNING_SECRET"))
 
 	cfg := Config{
-		Enabled:           enabled,
+		EnabledFlag:       enabled,
 		BatchSize:         batchSize,
 		PollInterval:      pollInterval,
 		RetryBaseDelay:    retryBase,
@@ -107,5 +107,5 @@ func (c Config) Validate() error {
 }
 
 func (c Config) Enabled() bool {
-	return c.Enabled
+	return c.EnabledFlag
 }

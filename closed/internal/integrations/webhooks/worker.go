@@ -281,6 +281,7 @@ func (w *Worker) recordAttempt(ctx context.Context, delivery Delivery, attempted
 	if _, err := w.attempts.Insert(ctx, attempt); err != nil {
 		w.logWarn("webhook attempt insert failed", "delivery_id", delivery.ID, "project_id", delivery.ProjectID, "event_id", delivery.EventID, "error", err)
 	}
+	recordAttemptMetrics(outcome, latency)
 	w.auditAttempt(ctx, delivery, attemptNumber, outcome, statusCode, errMsg)
 }
 

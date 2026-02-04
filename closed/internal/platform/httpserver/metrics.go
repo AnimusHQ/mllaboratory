@@ -2,13 +2,19 @@ package httpserver
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"runtime"
 	"strings"
+	"sync"
 	"time"
 )
 
-var metricsStartTime = time.Now().UTC()
+var (
+	metricsStartTime = time.Now().UTC()
+	metricsMu        sync.RWMutex
+	metricsProviders []func(io.Writer)
+)
 
 // RegisterMetrics exposes a minimal Prometheus-compatible endpoint.
 func RegisterMetrics(mux *http.ServeMux, service string) {
@@ -25,5 +31,23 @@ func RegisterMetrics(mux *http.ServeMux, service string) {
 		fmt.Fprintf(w, "# HELP animus_go_goroutines Number of goroutines.\n")
 		fmt.Fprintf(w, "# TYPE animus_go_goroutines gauge\n")
 		fmt.Fprintf(w, "animus_go_goroutines{service=\"%s\"} %d\n", service, runtime.NumGoroutine())
+		metricsMu.RLock()
+		providers := append([]func(io.Writer){}, metricsProviders...)
+		metricsMu.RUnlock()
+		for _, provider := range providers {
+			if provider != nil {
+				provider(w)
+			}
+		}
 	})
+}
+
+// RegisterMetricsProvider adds a callback for custom metrics to /metrics.
+func RegisterMetricsProvider(provider func(io.Writer)) {
+	if provider == nil {
+		return
+	}
+	metricsMu.Lock()
+	metricsProviders = append(metricsProviders, provider)
+	metricsMu.Unlock()
 }

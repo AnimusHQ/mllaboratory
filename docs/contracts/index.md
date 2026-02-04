@@ -68,6 +68,15 @@
 - Запрос секретов выполняется по `secret_access_class_ref`; TTL обязателен, ошибки приводят к отказу исполнения.
 - Redaction: значения секретов не попадают в логи, аудит и ответы API.
 
+### 1.10 Исходящие вебхуки (P5)
+- Подписки: `POST/GET /projects/{project_id}/webhooks/subscriptions`, обновление `PATCH/PUT /projects/{project_id}/webhooks/subscriptions/{subscription_id}`.
+- Доставки: `GET /projects/{project_id}/webhooks/deliveries`, попытки `GET /projects/{project_id}/webhooks/deliveries/{delivery_id}/attempts`, replay `POST /projects/{project_id}/webhooks/deliveries/{delivery_id}:replay`.
+- События: `RunFinished`, `ModelApproved`, `DatasetVersionCreated`; `event_id` детерминирован по `event_type + project_id + subject_id`.
+- Идемпотентность: уникальность `(subscription_id, event_id)`; заголовок `Idempotency-Key = event_id:subscription_id`.
+- Подпись: `X-Animus-Signature: sha256=<hex>` (HMAC от payload); секрет извлекается по `secret_ref`.
+- Очередь персистентна: `webhook_deliveries` + `webhook_delivery_attempts`, ретраи детерминированы.
+- Аудит: `webhook.subscription.created|updated|enabled|disabled`, `webhook.delivery.enqueued|attempted|delivered|failed`, `webhook.delivery.replay_requested`.
+
 ## 2. Контракт CP↔DP (Data Plane протокол)
 ### 2.1 Текущий статус
 - Транспорт: **HTTP + OpenAPI**, контракт зафиксирован в `open/api/openapi/dataplane_internal.yaml` (ADR‑0007).
