@@ -111,6 +111,7 @@ func main() {
 			},
 		),
 	)
+	httpserver.RegisterMetrics(mux, "dataset-registry")
 
 	uploadMaxMiB, err := env.Int("DATASET_REGISTRY_UPLOAD_MAX_MIB", 2048)
 	if err != nil {

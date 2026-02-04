@@ -113,6 +113,7 @@ func main() {
 			},
 		),
 	)
+	httpserver.RegisterMetrics(mux, "audit")
 
 	api := newAuditAPI(logger, db, exportCfg)
 	api.register(mux)

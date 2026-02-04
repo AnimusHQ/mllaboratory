@@ -181,6 +181,7 @@ func main() {
 			},
 		),
 	)
+	httpserver.RegisterMetrics(mux, "experiments")
 
 	datapilotURL := env.String("ANIMUS_DATAPILOT_URL", "http://localhost:8080")
 	dataplaneURL := env.String("ANIMUS_DATAPLANE_URL", "")

@@ -95,6 +95,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", httpserver.Healthz("dataplane"))
 	mux.HandleFunc("/readyz", httpserver.Readyz("dataplane"))
+	httpserver.RegisterMetrics(mux, "dataplane")
 	api.register(mux)
 
 	authorizer := auth.MethodRoleAuthorizer()
