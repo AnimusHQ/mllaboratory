@@ -61,6 +61,13 @@
 - API (read‑only): `GET /projects/{project_id}/registry/verifications`.
 - Аудит: `image.verification.requested`, `image.verified`, `image.verification_failed`, `environment.lock.creation_blocked`.
 
+### 1.9 Секреты и Vault‑подобный backend (P5)
+- Значения секретов выдаются только в DP на время исполнения; CP хранит лишь `secret_access_class_ref`.
+- DP отправляет CP событие `SecretAccessed` с метаданными доступа (без значений).
+- Провайдеры: `noop`, `static`, `vault_k8s` (Kubernetes auth, краткоживущие токены).
+- Запрос секретов выполняется по `secret_access_class_ref`; TTL обязателен, ошибки приводят к отказу исполнения.
+- Redaction: значения секретов не попадают в логи, аудит и ответы API.
+
 ## 2. Контракт CP↔DP (Data Plane протокол)
 ### 2.1 Текущий статус
 - Транспорт: **HTTP + OpenAPI**, контракт зафиксирован в `open/api/openapi/dataplane_internal.yaml` (ADR‑0007).
