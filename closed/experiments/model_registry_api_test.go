@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -179,7 +180,10 @@ func TestModelExportRequiresApproved(t *testing.T) {
 	api := &experimentsAPI{
 		modelVersionStoreOverride: versionStore,
 		modelExportStoreOverride:  exportStore,
-		modelAuditOverride:        audit,
+		modelExportPolicyOverride: func(ctx context.Context, projectID, runID string) (modelExportPolicyDecision, error) {
+			return modelExportPolicyDecision{Allowed: true}, nil
+		},
+		modelAuditOverride: audit,
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/projects/proj-1/model-versions/ver-1:export", nil)
@@ -212,7 +216,10 @@ func TestModelExportIdempotent(t *testing.T) {
 	api := &experimentsAPI{
 		modelVersionStoreOverride: versionStore,
 		modelExportStoreOverride:  exportStore,
-		modelAuditOverride:        audit,
+		modelExportPolicyOverride: func(ctx context.Context, projectID, runID string) (modelExportPolicyDecision, error) {
+			return modelExportPolicyDecision{Allowed: true}, nil
+		},
+		modelAuditOverride: audit,
 	}
 
 	req := httptest.NewRequest(http.MethodPost, "/projects/proj-1/model-versions/ver-1:export", nil)
@@ -254,5 +261,40 @@ func TestModelExportIdempotent(t *testing.T) {
 	}
 	if audit.count(auditModelExportRequested) != 1 {
 		t.Fatalf("expected single export audit")
+	}
+}
+
+func TestModelExportPolicyDenied(t *testing.T) {
+	versionStore := newStubModelVersionStore()
+	versionStore.versions["ver-1"] = domain.ModelVersion{
+		ID:        "ver-1",
+		ProjectID: "proj-1",
+		ModelID:   "model-1",
+		RunID:     "run-1",
+		Status:    domain.ModelStatusApproved,
+	}
+	exportStore := newStubModelExportStore()
+
+	api := &experimentsAPI{
+		modelVersionStoreOverride: versionStore,
+		modelExportStoreOverride:  exportStore,
+		modelExportPolicyOverride: func(ctx context.Context, projectID, runID string) (modelExportPolicyDecision, error) {
+			return modelExportPolicyDecision{Allowed: false, Code: modelExportPolicyDenied}, nil
+		},
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/projects/proj-1/model-versions/ver-1:export", nil)
+	req.SetPathValue("project_id", "proj-1")
+	req.SetPathValue("model_version_id", "ver-1")
+	req.Header.Set("Idempotency-Key", "idem-1")
+	req = req.WithContext(auth.ContextWithIdentity(req.Context(), auth.Identity{Subject: "user-1"}))
+	resp := httptest.NewRecorder()
+	api.handleExportModelVersion(resp, req)
+
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("status=%d want 403", resp.Code)
+	}
+	if exportStore.createCalls != 0 {
+		t.Fatalf("expected no export creation on policy deny")
 	}
 }

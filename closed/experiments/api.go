@@ -76,6 +76,7 @@ type experimentsAPI struct {
 	modelVersionTransitionOverride modelVersionTransitionStore
 	modelVersionProvenanceOverride modelVersionProvenanceStore
 	modelExportStoreOverride       modelExportStore
+	modelExportPolicyOverride      func(ctx context.Context, projectID, runID string) (modelExportPolicyDecision, error)
 	modelRunBindingsOverride       runBindingsStore
 	modelRunSpecOverride           runSpecStore
 	modelAuditOverride             modelAuditAppender

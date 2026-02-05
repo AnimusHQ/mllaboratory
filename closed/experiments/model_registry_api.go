@@ -1044,6 +1044,15 @@ func (api *experimentsAPI) handleExportModelVersion(w http.ResponseWriter, r *ht
 		api.writeError(w, r, http.StatusConflict, "model_version_not_approved")
 		return
 	}
+	policyDecision, err := api.checkModelExportPolicy(r.Context(), projectID, version.RunID)
+	if err != nil {
+		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
+		return
+	}
+	if !policyDecision.Allowed {
+		api.writeError(w, r, http.StatusForbidden, policyDecision.Code)
+		return
+	}
 
 	now := time.Now().UTC()
 	export := domain.ModelExport{
