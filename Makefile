@@ -18,7 +18,7 @@ export GOCACHE := $(CACHE_DIR)/go-build
 export GOMODCACHE := $(CACHE_DIR)/go-mod
 export GOTMPDIR := $(CACHE_DIR)/go-tmp
 
-.PHONY: bootstrap fmt test integrations-test lint build openapi-lint guardrails-check dev demo demo-smoke demo-down e2e sbom vuln-scan supply-chain helm-images
+.PHONY: bootstrap fmt test integrations-test dr-validate lint build openapi-lint guardrails-check dev demo demo-smoke demo-down e2e sbom vuln-scan supply-chain helm-images
 
 bootstrap:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"
@@ -83,6 +83,13 @@ test:
 integrations-test:
 	@./scripts/go_test.sh ./closed/...
 
+
+dr-validate:
+	@if [ "$$ANIMUS_DR_VALIDATE" != "1" ]; then \
+		echo "dr-validate: ANIMUS_DR_VALIDATE not set; skipping."; \
+		exit 0; \
+	fi
+	@./closed/scripts/dr-validate.sh
 
 build:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"

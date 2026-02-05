@@ -38,6 +38,14 @@ ANIMUS_DR_TOKEN="..." \
 ANIMUS_DR_PROJECT_ID="proj-1" \
 closed/scripts/verify-restore.sh
 ```
+Альтернатива для CI‑сценариев при наличии инфраструктуры:
+```bash
+ANIMUS_DR_VALIDATE=1 \
+ANIMUS_GATEWAY_URL="https://gateway.example" \
+ANIMUS_DR_TOKEN="..." \
+ANIMUS_DR_PROJECT_ID="proj-1" \
+make dr-validate
+```
 6. (Опционально) Запустить E2E‑набор при наличии инфраструктуры:
 ```bash
 make e2e
