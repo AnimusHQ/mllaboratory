@@ -49,9 +49,16 @@
 
 ### 1.7 Регистр моделей и продвижение (M8)
 - Model/ModelVersion иммутабельны, статусы версий: `draft → validated → approved → deprecated`.
-- Provenance версии фиксирует Run + Artifacts + DatasetVersions + CodeRef + EnvLock + PolicySnapshot.
+- Provenance версии фиксирует `run_id`, `artifact_ids`, `dataset_version_ids`, `code_ref`, `env_lock_id`, `policy_snapshot_sha256`.
 - Аппрув/депрекейт требуют админ‑ролей; валидация доступна editor.
 - Экспорт версии разрешён только для `approved`; операции идемпотентны по `Idempotency-Key` и аудируются.
+- Таблицы: `model_versions`, `model_version_transitions`, `model_exports` (idempotency по `(project_id, idempotency_key)`).
+- API:
+  - модели: `GET/POST /projects/{project_id}/models`, `GET /projects/{project_id}/models/{model_id}`;
+  - версии: `GET/POST /projects/{project_id}/models/{model_id}/versions`, `GET /projects/{project_id}/model-versions/{model_version_id}`;
+  - provenance: `GET /projects/{project_id}/model-versions/{model_version_id}/provenance`;
+  - переходы: `POST /projects/{project_id}/model-versions/{model_version_id}:validate|approve|deprecate`;
+  - экспорт: `POST /projects/{project_id}/model-versions/{model_version_id}:export`.
 
 ### 1.8 Целостность образов и подписи реестра (P5)
 - Enforcement: создание EnvironmentLock (ADR‑0012), CP не исполняет пользовательский код.
