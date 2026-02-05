@@ -215,7 +215,11 @@ func (s *OIDCService) CallbackHandler() (http.HandlerFunc, error) {
 				RemoteIP:  ParseRemoteIP(r.RemoteAddr),
 				Actor:     extractSubjectClaim(claims),
 			}
-			expiresAt := time.Now().UTC().Add(s.cfg.SessionCookieMaxAge)
+			now := time.Now().UTC()
+			if s.sessions != nil && s.sessions.Now != nil {
+				now = s.sessions.Now().UTC()
+			}
+			expiresAt := now.Add(s.cfg.SessionCookieMaxAge)
 			if !idToken.Expiry.IsZero() && idToken.Expiry.Before(expiresAt) {
 				expiresAt = idToken.Expiry.UTC()
 			}
