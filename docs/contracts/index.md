@@ -50,8 +50,9 @@
 ### 1.7 Регистр моделей и продвижение (M8)
 - Model/ModelVersion иммутабельны, статусы версий: `draft → validated → approved → deprecated`.
 - Provenance версии фиксирует `run_id`, `artifact_ids`, `dataset_version_ids`, `code_ref`, `env_lock_id`, `policy_snapshot_sha256`.
+- Материализованные связи provenance: `model_version_artifacts`, `model_version_datasets`.
 - Аппрув/депрекейт требуют админ‑ролей; валидация доступна editor.
-- Экспорт версии разрешён только для `approved`; операции идемпотентны по `Idempotency-Key` и аудируются.
+- Экспорт версии разрешён только для `approved` и при выполнении policy‑решений по `run_id` (deny‑by‑default; approvals обязательны при `require_approval`); операции идемпотентны по `Idempotency-Key` и аудируются.
 - Таблицы: `model_versions`, `model_version_transitions`, `model_exports` (idempotency по `(project_id, idempotency_key)`).
 - API:
   - модели: `GET/POST /projects/{project_id}/models`, `GET /projects/{project_id}/models/{model_id}`;
