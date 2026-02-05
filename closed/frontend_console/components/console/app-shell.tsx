@@ -32,6 +32,7 @@ const navSections: NavSection[] = [
     items: [
       { label: 'Проекты', href: '/console/projects', description: 'Контекст, роли, архив' },
       { label: 'Наборы данных', href: '/console/datasets', description: 'Версии и качество' },
+      { label: 'Артефакты', href: '/console/artifacts', description: 'Хранилище и загрузки' },
       { label: 'Запуски', href: '/console/runs', description: 'Очереди, ретраи, состояния' },
       { label: 'Пайплайны', href: '/console/pipelines', description: 'DAG, узлы, исполнение' },
       { label: 'Среды', href: '/console/environments', description: 'Шаблоны и блокировки' },

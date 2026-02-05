@@ -1,60 +1,49 @@
+import { DatasetsTable } from '@/components/console/datasets-table';
+import { ErrorState } from '@/components/console/error-state';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageShell } from '@/components/ui/page-shell';
+import { GatewayAPIError } from '@/lib/gateway-client';
+import type { components } from '@/lib/gateway-openapi';
+import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
-const copy = {
-  datasets: {
-    title: 'Наборы данных',
-    description: 'Регистрация, версии, загрузки и контроль качества. Все обращения идут через Gateway API.',
-  },
-  runs: {
-    title: 'Запуски',
-    description: 'Создание, управление состояниями, ретраи и пакеты воспроизводимости.',
-  },
-  pipelines: {
-    title: 'Пайплайны',
-    description: 'DAG‑исполнение, узлы и контролируемые отмены.',
-  },
-  environments: {
-    title: 'Среды исполнения',
-    description: 'Шаблоны, блокировки окружений и верификация образов.',
-  },
-  devenvs: {
-    title: 'DevEnv (IDE)',
-    description: 'Сессии IDE через прокси, контроль TTL и остановка окружений.',
-  },
-  models: {
-    title: 'Регистр моделей',
-    description: 'Жизненный цикл версий, экспорт и provenance.',
-  },
-  lineage: {
-    title: 'Lineage',
-    description: 'Графы происхождения запусков и версий моделей.',
-  },
-  audit: {
-    title: 'Аудит / SIEM',
-    description: 'События аудита, доставки, попытки и DLQ.',
-  },
-  ops: {
-    title: 'Ops',
-    description: 'Операционная готовность, контроль метрик и health‑состояния.',
-  },
-} as const;
+export default async function DatasetsPage() {
+  let data: components['schemas']['DatasetListResponse'] | null = null;
+  let error: GatewayAPIError | null = null;
 
-const meta = copy['datasets' as keyof typeof copy];
+  try {
+    data = await gatewayServerFetchJSON<components['schemas']['DatasetListResponse']>(
+      '/api/dataset-registry/datasets?limit=200',
+    );
+  } catch (err) {
+    if (err instanceof GatewayAPIError) {
+      error = err;
+    } else {
+      error = new GatewayAPIError(500, 'gateway_unexpected');
+    }
+  }
 
-export default function SectionPage() {
   return (
     <PageShell>
-      <PageHeader title={meta.title} description={meta.description} />
+      <PageHeader
+        title="Наборы данных"
+        description="Реестр датасетов, версии и контроль качества. Операции протоколируются аудитом."
+        actions={
+          <Button variant="secondary" size="sm">
+            Зарегистрировать набор
+          </Button>
+        }
+      />
+      {error ? (
+        <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} />
+      ) : null}
       <Card>
         <CardHeader>
-          <CardTitle>Рабочий контур</CardTitle>
-          <CardDescription>Раздел подключается к Gateway API с учётом RBAC и аудита.</CardDescription>
+          <CardTitle>Список наборов данных</CardTitle>
+          <CardDescription>Данные получены через Gateway API. Сортировка по времени создания.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Интерфейс выстроен по workflow‑логике. Заполнение данных и формы будут добавлены в следующих коммитах.
-          </p>
+          {data ? <DatasetsTable datasets={data.datasets ?? []} /> : <p className="text-sm">Загрузка…</p>}
         </CardContent>
       </Card>
     </PageShell>
