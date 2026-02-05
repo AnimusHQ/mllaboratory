@@ -13,6 +13,9 @@ func TestBuildDevEnvJobSpecSetsTTL(t *testing.T) {
 		DevEnvID:    "dev-1",
 		ProjectID:   "proj-1",
 		TemplateRef: "tmpl-1",
+		RepoURL:     "https://github.com/acme/repo",
+		RefType:     domain.DevEnvRefTypeBranch,
+		RefValue:    "main",
 		ImageRef:    "registry.example/dev:latest",
 		TTLSeconds:  3600,
 		ResourceDefaults: domain.EnvironmentResources{
@@ -24,7 +27,7 @@ func TestBuildDevEnvJobSpecSetsTTL(t *testing.T) {
 		},
 	}
 
-	job, err := buildDevEnvJobSpec(req, "job-1", "ns-1", "sa-1", 120)
+	job, err := buildDevEnvJobSpec(req, "job-1", "ns-1", "sa-1", 120, "/workspace", "alpine/git:2.43.0", "code-server --bind-addr 0.0.0.0:8080 --auth none /workspace", 8080)
 	if err != nil {
 		t.Fatalf("build job: %v", err)
 	}
@@ -48,6 +51,21 @@ func TestBuildDevEnvJobSpecSetsTTL(t *testing.T) {
 	}
 	if !hasEnvVar(job.Spec.Template.Spec.Containers[0].Env, "ANIMUS_DEV_ENV_TTL_SECONDS", "3600") {
 		t.Fatalf("expected ttl env var to be set")
+	}
+	if len(job.Spec.Template.Spec.InitContainers) != 1 {
+		t.Fatalf("expected init container")
+	}
+	if got := job.Spec.Template.Spec.InitContainers[0].Image; got != "alpine/git:2.43.0" {
+		t.Fatalf("expected git init container image, got %q", got)
+	}
+	if len(job.Spec.Template.Spec.Volumes) != 1 || job.Spec.Template.Spec.Volumes[0].Name != "workspace" {
+		t.Fatalf("expected workspace volume")
+	}
+	if len(job.Spec.Template.Spec.Containers[0].VolumeMounts) != 1 {
+		t.Fatalf("expected workspace mount on main container")
+	}
+	if len(job.Spec.Template.Spec.Containers[0].Ports) != 1 || job.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort != 8080 {
+		t.Fatalf("expected code server port to be set")
 	}
 }
 

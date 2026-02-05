@@ -60,6 +60,10 @@ type DevEnvProvisionRequest struct {
 	TemplateRef          string                      `json:"templateRef"`
 	TemplateVersion      int                         `json:"templateVersion,omitempty"`
 	TemplateIntegritySHA string                      `json:"templateIntegritySha256,omitempty"`
+	RepoURL              string                      `json:"repoUrl,omitempty"`
+	RefType              string                      `json:"refType,omitempty"`
+	RefValue             string                      `json:"refValue,omitempty"`
+	CommitPin            string                      `json:"commitPin,omitempty"`
 	ImageName            string                      `json:"imageName,omitempty"`
 	ImageRef             string                      `json:"imageRef"`
 	ResourceDefaults     domain.EnvironmentResources `json:"resourceDefaults,omitempty"`

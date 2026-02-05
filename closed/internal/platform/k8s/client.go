@@ -131,6 +131,28 @@ func (c *Client) CreateJob(ctx context.Context, namespace string, job Job) error
 	return c.do(req, nil)
 }
 
+func (c *Client) CreateService(ctx context.Context, namespace string, service Service) error {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	service.APIVersion = "v1"
+	service.Kind = "Service"
+	service.Metadata.Namespace = namespace
+
+	body, err := json.Marshal(service)
+	if err != nil {
+		return fmt.Errorf("marshal service: %w", err)
+	}
+	path := fmt.Sprintf("/api/v1/namespaces/%s/services", namespace)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+path, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return c.do(req, nil)
+}
+
 func (c *Client) GetJob(ctx context.Context, namespace string, name string) (Job, error) {
 	namespace = strings.TrimSpace(namespace)
 	if namespace == "" {
@@ -162,6 +184,23 @@ func (c *Client) DeleteJob(ctx context.Context, namespace string, name string) e
 		return errors.New("job name is required")
 	}
 	path := fmt.Sprintf("/apis/batch/v1/namespaces/%s/jobs/%s", namespace, name)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, nil)
+	if err != nil {
+		return err
+	}
+	return c.do(req, nil)
+}
+
+func (c *Client) DeleteService(ctx context.Context, namespace string, name string) error {
+	namespace = strings.TrimSpace(namespace)
+	if namespace == "" {
+		namespace = c.namespace
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return errors.New("service name is required")
+	}
+	path := fmt.Sprintf("/api/v1/namespaces/%s/services/%s", namespace, name)
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, c.baseURL+path, nil)
 	if err != nil {
 		return err

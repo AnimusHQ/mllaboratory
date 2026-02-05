@@ -63,6 +63,14 @@ func main() {
 		logger.Error("invalid dev env ttl after finished", "error", err)
 		os.Exit(2)
 	}
+	devEnvWorkspacePath := env.String("ANIMUS_DEVENV_WORKSPACE_PATH", "")
+	devEnvGitImage := env.String("ANIMUS_DEVENV_GIT_IMAGE", "")
+	devEnvCodeServerCommand := env.String("ANIMUS_DEVENV_CODE_SERVER_CMD", "")
+	devEnvCodeServerPort, err := env.Int("ANIMUS_DEVENV_CODE_SERVER_PORT", 8080)
+	if err != nil {
+		logger.Error("invalid dev env code server port", "error", err)
+		os.Exit(2)
+	}
 	heartbeatInterval, err := env.Duration("ANIMUS_DATAPLANE_HEARTBEAT_INTERVAL", 15*time.Second)
 	if err != nil {
 		logger.Error("invalid heartbeat interval", "error", err)
@@ -103,6 +111,10 @@ func main() {
 		DevEnvNamespace:               devEnvNamespace,
 		DevEnvServiceAccount:          devEnvServiceAccount,
 		DevEnvTTLAfterFinishedSeconds: int32(devEnvTTLAfterFinished),
+		DevEnvWorkspacePath:           devEnvWorkspacePath,
+		DevEnvGitImage:                devEnvGitImage,
+		DevEnvCodeServerCommand:       devEnvCodeServerCommand,
+		DevEnvCodeServerPort:          int32(devEnvCodeServerPort),
 		HeartbeatInterval:             heartbeatInterval,
 		PollInterval:                  pollInterval,
 		EgressMode:                    egressMode,

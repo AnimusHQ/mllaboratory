@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -24,6 +25,10 @@ type dataplaneConfig struct {
 	DevEnvNamespace               string
 	DevEnvServiceAccount          string
 	DevEnvTTLAfterFinishedSeconds int32
+	DevEnvWorkspacePath           string
+	DevEnvGitImage                string
+	DevEnvCodeServerCommand       string
+	DevEnvCodeServerPort          int32
 	HeartbeatInterval             time.Duration
 	PollInterval                  time.Duration
 	EgressMode                    string
@@ -49,6 +54,18 @@ func newDataplaneAPI(logger *slog.Logger, cp *controlPlaneClient, k8sClient *k8s
 	}
 	if cfg.DevEnvTTLAfterFinishedSeconds < 0 {
 		cfg.DevEnvTTLAfterFinishedSeconds = 0
+	}
+	if strings.TrimSpace(cfg.DevEnvWorkspacePath) == "" {
+		cfg.DevEnvWorkspacePath = "/workspace"
+	}
+	if strings.TrimSpace(cfg.DevEnvGitImage) == "" {
+		cfg.DevEnvGitImage = "alpine/git:2.43.0"
+	}
+	if cfg.DevEnvCodeServerPort <= 0 {
+		cfg.DevEnvCodeServerPort = 8080
+	}
+	if strings.TrimSpace(cfg.DevEnvCodeServerCommand) == "" {
+		cfg.DevEnvCodeServerCommand = "code-server --bind-addr 0.0.0.0:" + strconv.FormatInt(int64(cfg.DevEnvCodeServerPort), 10) + " --auth none " + cfg.DevEnvWorkspacePath
 	}
 	return &dataplaneAPI{
 		logger:   logger,

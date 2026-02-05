@@ -18,19 +18,45 @@ type ResourceRequirements struct {
 	Requests map[string]string `json:"requests,omitempty"`
 }
 
+type ContainerPort struct {
+	Name          string `json:"name,omitempty"`
+	ContainerPort int32  `json:"containerPort"`
+	Protocol      string `json:"protocol,omitempty"`
+}
+
+type VolumeMount struct {
+	Name      string `json:"name"`
+	MountPath string `json:"mountPath"`
+	ReadOnly  bool   `json:"readOnly,omitempty"`
+}
+
+type EmptyDirVolumeSource struct {
+	Medium    string `json:"medium,omitempty"`
+	SizeLimit string `json:"sizeLimit,omitempty"`
+}
+
+type Volume struct {
+	Name     string               `json:"name"`
+	EmptyDir *EmptyDirVolumeSource `json:"emptyDir,omitempty"`
+}
+
 type Container struct {
-	Name      string               `json:"name"`
-	Image     string               `json:"image"`
-	Command   []string             `json:"command,omitempty"`
-	Args      []string             `json:"args,omitempty"`
-	Env       []EnvVar             `json:"env,omitempty"`
-	Resources ResourceRequirements `json:"resources,omitempty"`
+	Name         string               `json:"name"`
+	Image        string               `json:"image"`
+	Command      []string             `json:"command,omitempty"`
+	Args         []string             `json:"args,omitempty"`
+	Env          []EnvVar             `json:"env,omitempty"`
+	Resources    ResourceRequirements `json:"resources,omitempty"`
+	Ports        []ContainerPort      `json:"ports,omitempty"`
+	VolumeMounts []VolumeMount        `json:"volumeMounts,omitempty"`
 }
 
 type PodSpec struct {
 	RestartPolicy      string      `json:"restartPolicy,omitempty"`
 	ServiceAccountName string      `json:"serviceAccountName,omitempty"`
+	InitContainers     []Container `json:"initContainers,omitempty"`
 	Containers         []Container `json:"containers"`
+	Volumes            []Volume    `json:"volumes,omitempty"`
 }
 
 type PodTemplateSpec struct {
