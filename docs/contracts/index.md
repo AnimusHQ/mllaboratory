@@ -58,7 +58,8 @@
   - версии: `GET/POST /projects/{project_id}/models/{model_id}/versions`, `GET /projects/{project_id}/model-versions/{model_version_id}`;
   - provenance: `GET /projects/{project_id}/model-versions/{model_version_id}/provenance`;
   - переходы: `POST /projects/{project_id}/model-versions/{model_version_id}:validate|approve|deprecate`;
-  - экспорт: `POST /projects/{project_id}/model-versions/{model_version_id}:export`.
+- экспорт: `POST /projects/{project_id}/model-versions/{model_version_id}:export`.
+
 
 ### 1.8 Целостность образов и подписи реестра (P5)
 - Enforcement: создание EnvironmentLock (ADR‑0012), CP не исполняет пользовательский код.
@@ -94,6 +95,11 @@
 - Подпись webhook: `X-Animus-Signature: sha256=<hex>`, секрет извлекается по `webhook_secret_ref` (CP не хранит значения).
 - Аудит: `audit.export.attempted`, `audit.export.delivered`, `audit.export.dlq`, `audit.export.replay_requested`.
 - Метрики: `animus_audit_export_attempts_total`, `animus_audit_export_latency_seconds_*`, `animus_audit_export_dlq_size`.
+
+### 1.12 Lineage (M9)
+- Материализованные связи хранятся в `lineage_events` (subject/predicate/object).
+- Эндпоинты графа: `GET /api/lineage/runs/{run_id}` (подграф Run), `GET /api/lineage/model-versions/{model_version_id}` (подграф происхождения модели).
+- Параметры подграфа: `depth`, `max_edges`; ответ содержит `root`, `nodes`, `edges`.
 
 ## 2. Контракт CP↔DP (Data Plane протокол)
 ### 2.1 Текущий статус
