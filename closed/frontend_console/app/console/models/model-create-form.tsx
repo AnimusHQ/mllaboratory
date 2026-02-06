@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
 import { useOperations } from '@/lib/operations';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 type ModelCreateResult = {
   model: {
@@ -22,7 +24,7 @@ type ModelCreateResult = {
   created: boolean;
 };
 
-export function ModelCreateForm({ projectId }: { projectId: string }) {
+export function ModelCreateForm({ projectId, role }: { projectId: string; role: EffectiveRole }) {
   const [name, setName] = useState('');
   const [metadata, setMetadata] = useState('{\n  "domain": "nlp"\n}');
   const [idempotencyKey, setIdempotencyKey] = useState('');
@@ -30,6 +32,7 @@ export function ModelCreateForm({ projectId }: { projectId: string }) {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [result, setResult] = useState<ModelCreateResult | null>(null);
   const { addOperation, updateOperation } = useOperations();
+  const allowed = can(role, 'model:write');
 
   const submit = async () => {
     if (!projectId) {
@@ -99,13 +102,14 @@ export function ModelCreateForm({ projectId }: { projectId: string }) {
             <Input id="idem" value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
           </div>
           {fieldError ? <div className="text-sm text-rose-200">Ошибка формы: {fieldError}</div> : null}
-          <Button variant="default" size="sm" onClick={submit} disabled={!projectId}>
+          <Button variant="default" size="sm" onClick={submit} disabled={!projectId || !allowed}>
             Создать модель
           </Button>
+          <PolicyHint allowed={allowed} capability="model:write" />
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {result ? (
         <Card>

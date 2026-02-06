@@ -1,13 +1,16 @@
 import Link from 'next/link';
 
 import { CopyButton } from '@/components/console/copy-button';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
 import type { components } from '@/lib/gateway-openapi';
 import { formatDateTime } from '@/lib/format';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 export type DatasetVersion = components['schemas']['DatasetVersion'];
 
-export function DatasetVersionsTable({ versions }: { versions: DatasetVersion[] }) {
+export function DatasetVersionsTable({ versions, role }: { versions: DatasetVersion[]; role: EffectiveRole }) {
+  const canRead = can(role, 'dataset:read');
   return (
     <TableContainer>
       <Table>
@@ -35,12 +38,19 @@ export function DatasetVersionsTable({ versions }: { versions: DatasetVersion[] 
               <td className="text-xs text-muted-foreground">{version.size_bytes ?? '—'}</td>
               <td className="text-xs text-muted-foreground">{formatDateTime(version.created_at)}</td>
               <td>
-                <Link
-                  href={`/api/dataset-registry/dataset-versions/${version.version_id}/download`}
-                  className="text-sm font-semibold text-primary"
-                >
-                  Скачать
-                </Link>
+                <div className="space-y-1">
+                  {canRead ? (
+                    <Link
+                      href={`/api/dataset-registry/dataset-versions/${version.version_id}/download`}
+                      className="text-sm font-semibold text-primary"
+                    >
+                      Скачать
+                    </Link>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Скачивание недоступно</span>
+                  )}
+                  <PolicyHint allowed={canRead} capability="dataset:read" />
+                </div>
               </td>
             </tr>
           ))}

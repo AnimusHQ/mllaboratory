@@ -5,17 +5,20 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 import { CopyButton } from '@/components/console/copy-button';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { Pagination } from '@/components/console/pagination';
 import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
 import type { components } from '@/lib/gateway-openapi';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 export type RunArtifact = components['schemas']['ExperimentRunArtifact'];
 
-export function ArtifactsTable({ artifacts }: { artifacts: RunArtifact[] }) {
+export function ArtifactsTable({ artifacts, role }: { artifacts: RunArtifact[]; role: EffectiveRole }) {
   const [query, setQuery] = useState('');
   const params = useSearchParams();
   const pageRaw = Number(params.get('page') ?? '1');
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
+  const canRead = can(role, 'artifact:read');
 
   const filtered = useMemo(() => {
     if (!query.trim()) {
@@ -77,14 +80,21 @@ export function ArtifactsTable({ artifacts }: { artifacts: RunArtifact[] }) {
                 <td className="text-muted-foreground">{artifact.filename ?? artifact.object_key}</td>
                 <td className="font-mono text-xs text-muted-foreground">{artifact.sha256}</td>
                 <td className="text-xs text-muted-foreground">{artifact.size_bytes}</td>
-                <td className="flex items-center gap-2">
-                  <CopyButton value={artifact.artifact_id} />
-                  <Link
-                    href={`/api/experiments/experiment-runs/${artifact.run_id}/artifacts/${artifact.artifact_id}/download`}
-                    className="text-xs font-semibold text-primary"
-                  >
-                    Скачать
-                  </Link>
+                <td className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <CopyButton value={artifact.artifact_id} />
+                    {canRead ? (
+                      <Link
+                        href={`/api/experiments/experiment-runs/${artifact.run_id}/artifacts/${artifact.artifact_id}/download`}
+                        className="text-xs font-semibold text-primary"
+                      >
+                        Скачать
+                      </Link>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Скачивание недоступно</span>
+                    )}
+                  </div>
+                  <PolicyHint allowed={canRead} capability="artifact:read" />
                 </td>
               </tr>
             ))}

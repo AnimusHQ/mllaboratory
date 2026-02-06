@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
@@ -91,7 +92,7 @@ export function DevEnvTable({ environments, projectId, role }: { environments: D
 
   return (
     <div className="flex flex-col gap-4">
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
       <TableContainer>
         <Table>
           <thead>
@@ -139,7 +140,6 @@ export function DevEnvTable({ environments, projectId, role }: { environments: D
                       size="sm"
                       onClick={() => openSession(env)}
                       disabled={!canWrite || !canRead}
-                      title={!canWrite ? 'Недостаточно прав DevEnvWrite' : undefined}
                     >
                       Открыть IDE
                     </Button>
@@ -148,11 +148,11 @@ export function DevEnvTable({ environments, projectId, role }: { environments: D
                       size="sm"
                       onClick={() => stopEnv(env)}
                       disabled={!canWrite}
-                      title={!canWrite ? 'Недостаточно прав DevEnvWrite' : undefined}
                     >
                       Остановить
                     </Button>
                   </div>
+                  <PolicyHint allowed={canWrite} capability="devenv:write" />
                 </td>
               </tr>
             ))}

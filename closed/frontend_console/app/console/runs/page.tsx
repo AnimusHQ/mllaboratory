@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { Pagination } from '@/components/console/pagination';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,9 @@ import { PageHeader, PageSection, PageShell } from '@/components/ui/page-shell';
 import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
 import { formatDateTime } from '@/lib/format';
+import { can, deriveEffectiveRole } from '@/lib/rbac';
 import { getActiveProjectId } from '@/lib/server-context';
+import { getGatewaySession } from '@/lib/session';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 import { RunFilters } from './run-filters';
@@ -64,6 +67,9 @@ type SearchParams = {
 };
 
 export default async function RunsPage({ searchParams }: { searchParams: SearchParams }) {
+  const session = await getGatewaySession();
+  const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
+  const canWrite = can(role, 'run:write');
   let runs: components['schemas']['ExperimentRun'][] = [];
   let error: GatewayAPIError | null = null;
 
@@ -125,9 +131,18 @@ export default async function RunsPage({ searchParams }: { searchParams: SearchP
         title={meta.title}
         description={meta.description}
         actions={
-          <Button asChild variant="secondary" size="sm">
-            <Link href="/console/runs/new">Новый RunSpec</Link>
-          </Button>
+          <div className="flex flex-col items-end gap-1">
+            {canWrite ? (
+              <Button asChild variant="secondary" size="sm">
+                <Link href="/console/runs/new">Новый RunSpec</Link>
+              </Button>
+            ) : (
+              <Button variant="secondary" size="sm" disabled>
+                Новый RunSpec
+              </Button>
+            )}
+            <PolicyHint allowed={canWrite} capability="run:write" />
+          </div>
         }
       />
       <Card>
@@ -148,7 +163,7 @@ export default async function RunsPage({ searchParams }: { searchParams: SearchP
         <RunFilters />
       </PageSection>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       <PageSection title="Реестр запусков" description="Неизменяемые записи Run. Таблица детерминированно отсортирована.">
         <TableContainer>

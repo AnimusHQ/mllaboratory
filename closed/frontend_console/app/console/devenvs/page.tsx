@@ -2,7 +2,9 @@ import Link from 'next/link';
 
 import { DevEnvTable } from '@/components/console/devenv-table';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { Pagination } from '@/components/console/pagination';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, PageSection, PageShell } from '@/components/ui/page-shell';
 import { GatewayAPIError } from '@/lib/gateway-client';
@@ -10,7 +12,7 @@ import type { components } from '@/lib/gateway-openapi';
 import { getActiveProjectId } from '@/lib/server-context';
 import { getGatewaySession } from '@/lib/session';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
-import { deriveEffectiveRole } from '@/lib/rbac';
+import { can, deriveEffectiveRole } from '@/lib/rbac';
 
 import { DevEnvFilters } from './devenv-filters';
 const copy = {
@@ -64,6 +66,7 @@ export default async function DevEnvsPage({ searchParams }: { searchParams: Sear
   const projectId = getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
+  const canWrite = can(role, 'devenv:write');
   let environments: components['schemas']['DevEnvironment'][] = [];
   let error: GatewayAPIError | null = null;
   const query = searchParams.q?.toLowerCase().trim() ?? '';
@@ -103,9 +106,18 @@ export default async function DevEnvsPage({ searchParams }: { searchParams: Sear
         title={meta.title}
         description={meta.description}
         actions={
-          <Link href="/console/devenvs/new" className="text-sm font-semibold text-primary">
-            Новый DevEnv
-          </Link>
+          <div className="flex flex-col items-end gap-1">
+            {canWrite ? (
+              <Link href="/console/devenvs/new" className="text-sm font-semibold text-primary">
+                Новый DevEnv
+              </Link>
+            ) : (
+              <Button variant="secondary" size="sm" disabled>
+                Новый DevEnv
+              </Button>
+            )}
+            <PolicyHint allowed={canWrite} capability="devenv:write" />
+          </div>
         }
       />
       <Card>
@@ -129,7 +141,7 @@ export default async function DevEnvsPage({ searchParams }: { searchParams: Sear
         </Card>
       ) : null}
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       <PageSection title="Фильтры и поиск">
         <DevEnvFilters />

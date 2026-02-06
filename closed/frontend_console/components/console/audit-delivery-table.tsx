@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
@@ -19,6 +20,7 @@ export function AuditDeliveryTable({ deliveries, role }: { deliveries: Delivery[
   const [rows, setRows] = useState(deliveries);
   const [error, setError] = useState<GatewayAPIError | null>(null);
   const { addOperation, updateOperation } = useOperations();
+  const allowed = can(role, 'ops:read');
 
   const replay = async (delivery: Delivery) => {
     if (!can(role, 'ops:read')) {
@@ -52,7 +54,7 @@ export function AuditDeliveryTable({ deliveries, role }: { deliveries: Delivery[
 
   return (
     <div className="flex flex-col gap-4">
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
       <TableContainer>
         <Table>
           <thead>
@@ -87,17 +89,20 @@ export function AuditDeliveryTable({ deliveries, role }: { deliveries: Delivery[
                   <div>Обновлено: {formatDateTime(delivery.updated_at)}</div>
                 </td>
                 <td>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => replay(delivery)}
-                    disabled={delivery.status !== 'DLQ'}
-                  >
-                    Replay
-                  </Button>
-                </td>
-              </tr>
-            ))}
+                    <div className="space-y-1">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => replay(delivery)}
+                        disabled={!allowed || delivery.status !== 'DLQ'}
+                      >
+                        Replay
+                      </Button>
+                      <PolicyHint allowed={allowed} capability="ops:read" />
+                    </div>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </Table>
         {rows.length === 0 ? <TableEmpty>Доставки отсутствуют.</TableEmpty> : null}

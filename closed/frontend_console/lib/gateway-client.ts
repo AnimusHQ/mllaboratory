@@ -7,11 +7,13 @@ export class GatewayAPIError extends Error {
   code: string;
   requestId?: string;
   details?: unknown;
+  retryable?: boolean;
 
-  constructor(status: number, code: string, requestId?: string, details?: unknown) {
-    super(code);
+  constructor(status: number, code: string, message?: string, requestId?: string, details?: unknown, retryable?: boolean) {
+    super(message ?? code);
     this.status = status;
     this.code = code;
+    this.retryable = retryable;
     this.requestId = requestId;
     this.details = details;
   }
@@ -37,14 +39,19 @@ const isSafeMethod = (method?: string) => {
   return ['GET', 'HEAD'].includes(method.toUpperCase());
 };
 
+const isRetryableStatus = (status: number) => status === 408 || status === 429 || (status >= 500 && status < 600);
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export async function gatewayFetch(path: string, init: GatewayFetchOptions = {}): Promise<Response> {
   const base = gatewayBaseURL();
   const url = base ? `${base}${path}` : path;
   const headers = new Headers(init.headers ?? {});
-  if (init.requestId) {
-    headers.set('X-Request-Id', init.requestId);
+  const requestId =
+    init.requestId ??
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `req-${Date.now()}`);
+  if (requestId) {
+    headers.set('X-Request-Id', requestId);
   }
 
   const attempt = async (): Promise<Response> =>
@@ -54,7 +61,7 @@ export async function gatewayFetch(path: string, init: GatewayFetchOptions = {})
     });
 
   const res = await attempt();
-  if (!res.ok && init.retry !== false && isSafeMethod(init.method) && res.status >= 500) {
+  if (!res.ok && init.retry !== false && isSafeMethod(init.method) && isRetryableStatus(res.status)) {
     await sleep(350);
     return attempt();
   }
@@ -83,10 +90,17 @@ export async function gatewayFetchJSON<T>(path: string, init: GatewayFetchOption
       parsed = undefined;
     }
   }
-  const errorPayload = parsed as ErrorResponse | undefined;
-  const code = errorPayload?.error ?? 'gateway_error';
-  const requestIdFinal = errorPayload?.request_id ?? requestId;
-  throw new GatewayAPIError(res.status, code, requestIdFinal, parsed);
+  const errorPayload = (parsed ?? {}) as Record<string, unknown>;
+  const code = (errorPayload?.error as string) ?? (errorPayload?.code as string) ?? 'gateway_error';
+  const message =
+    (errorPayload?.message as string) ??
+    (errorPayload?.detail as string) ??
+    (typeof errorPayload === 'string' ? errorPayload : undefined);
+  const requestIdFinal = (errorPayload?.request_id as string) ?? requestId;
+  const retryable =
+    (typeof errorPayload?.retryable === 'boolean' ? (errorPayload.retryable as boolean) : undefined) ??
+    isRetryableStatus(res.status);
+  throw new GatewayAPIError(res.status, code, message, requestIdFinal, parsed, retryable);
 }
 
 export type GatewayPaths = paths;

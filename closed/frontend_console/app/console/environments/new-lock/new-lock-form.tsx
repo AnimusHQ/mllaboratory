@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
 import { useOperations } from '@/lib/operations';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 type LockResponse = {
   lock: {
@@ -21,7 +23,7 @@ type LockResponse = {
   created: boolean;
 };
 
-export function NewLockForm({ projectId }: { projectId: string }) {
+export function NewLockForm({ projectId, role }: { projectId: string; role: EffectiveRole }) {
   const [envId, setEnvId] = useState('');
   const [digests, setDigests] = useState('{\n  "runtime": "sha256:..."\n}');
   const [idempotencyKey, setIdempotencyKey] = useState('');
@@ -29,6 +31,7 @@ export function NewLockForm({ projectId }: { projectId: string }) {
   const [error, setError] = useState<GatewayAPIError | null>(null);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const { addOperation, updateOperation } = useOperations();
+  const allowed = can(role, 'env:write');
 
   const submit = async () => {
     if (!projectId) {
@@ -108,13 +111,14 @@ export function NewLockForm({ projectId }: { projectId: string }) {
             <Input id="idem" value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
           </div>
           {fieldError ? <div className="text-sm text-rose-200">Ошибка формы: {fieldError}</div> : null}
-          <Button variant="default" size="sm" onClick={submit} disabled={!projectId}>
+          <Button variant="default" size="sm" onClick={submit} disabled={!projectId || !allowed}>
             Создать EnvLock
           </Button>
+          <PolicyHint allowed={allowed} capability="env:write" />
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {result ? (
         <Card>

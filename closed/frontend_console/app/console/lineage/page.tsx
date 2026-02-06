@@ -94,7 +94,7 @@ export default async function LineagePage({ searchParams }: { searchParams: Sear
         <LineageFilters />
       </PageSection>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {graph ? (
         <PageSection title="Граф">

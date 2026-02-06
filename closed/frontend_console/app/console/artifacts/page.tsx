@@ -6,6 +6,8 @@ import { Input } from '@/components/ui/input';
 import { PageHeader, PageShell } from '@/components/ui/page-shell';
 import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
+import { deriveEffectiveRole } from '@/lib/rbac';
+import { getGatewaySession } from '@/lib/session';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 export default async function ArtifactsPage({
@@ -13,6 +15,8 @@ export default async function ArtifactsPage({
 }: {
   searchParams?: { run_id?: string };
 }) {
+  const session = await getGatewaySession();
+  const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   const runId = searchParams?.run_id?.trim() ?? '';
   let data: components['schemas']['ExperimentRunArtifactListResponse'] | null = null;
   let error: GatewayAPIError | null = null;
@@ -57,7 +61,7 @@ export default async function ArtifactsPage({
         </CardContent>
       </Card>
       {error ? (
-        <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} />
+        <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} />
       ) : null}
       {data ? (
         <Card>
@@ -66,7 +70,7 @@ export default async function ArtifactsPage({
             <CardDescription>Сортировка по времени создания (desc).</CardDescription>
           </CardHeader>
           <CardContent>
-            <ArtifactsTable artifacts={data.artifacts ?? []} />
+            <ArtifactsTable artifacts={data.artifacts ?? []} role={role} />
           </CardContent>
         </Card>
       ) : null}

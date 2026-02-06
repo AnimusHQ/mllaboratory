@@ -2,14 +2,18 @@ import Link from 'next/link';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
 import { PageHeader, PageSection, PageShell } from '@/components/ui/page-shell';
 import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
 import { formatDateTime } from '@/lib/format';
+import { can, deriveEffectiveRole } from '@/lib/rbac';
 import { getActiveProjectId } from '@/lib/server-context';
+import { getGatewaySession } from '@/lib/session';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 import { EnvironmentFilters } from './environment-filters';
@@ -61,6 +65,9 @@ type SearchParams = {
 
 export default async function EnvironmentsPage({ searchParams }: { searchParams: SearchParams }) {
   const projectId = getActiveProjectId();
+  const session = await getGatewaySession();
+  const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
+  const canWrite = can(role, 'env:write');
   const query = searchParams.q?.toLowerCase().trim() ?? '';
   let definitions: components['schemas']['EnvironmentDefinition'][] = [];
   let locks: components['schemas']['EnvironmentLock'][] = [];
@@ -121,9 +128,18 @@ export default async function EnvironmentsPage({ searchParams }: { searchParams:
         title={meta.title}
         description={meta.description}
         actions={
-          <Link href="/console/environments/new-lock" className="text-sm font-semibold text-primary">
-            Новый EnvLock
-          </Link>
+          <div className="flex flex-col items-end gap-1">
+            {canWrite ? (
+              <Link href="/console/environments/new-lock" className="text-sm font-semibold text-primary">
+                Новый EnvLock
+              </Link>
+            ) : (
+              <Button variant="secondary" size="sm" disabled>
+                Новый EnvLock
+              </Button>
+            )}
+            <PolicyHint allowed={canWrite} capability="env:write" />
+          </div>
         }
       />
       <Card>
@@ -144,7 +160,7 @@ export default async function EnvironmentsPage({ searchParams }: { searchParams:
         <EnvironmentFilters />
       </PageSection>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       <PageSection title="Environment Definitions" description="Версии шаблонов окружений.">
         <TableContainer>

@@ -49,7 +49,7 @@ export default async function ProjectsPage() {
         </Card>
       ) : null}
       {error ? (
-        <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} />
+        <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} />
       ) : null}
       {projectId ? (
         <Card>

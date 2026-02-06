@@ -5,6 +5,7 @@ import Link from 'next/link';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -103,7 +104,7 @@ export function ModelVersionsTable({
 
   return (
     <div className="flex flex-col gap-4">
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
       <TableContainer>
         <Table>
           <thead>
@@ -187,6 +188,11 @@ export function ModelVersionsTable({
                       >
                         Экспорт
                       </Button>
+                    </div>
+                    <div className="space-y-1">
+                      <PolicyHint allowed={can(role, 'model:write')} capability="model:write" />
+                      <PolicyHint allowed={can(role, 'model:approve')} capability="model:approve" />
+                      <PolicyHint allowed={can(role, 'model:export')} capability="model:export" />
                     </div>
                   </div>
                 </td>

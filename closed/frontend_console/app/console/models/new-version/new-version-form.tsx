@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { CopyButton } from '@/components/console/copy-button';
 import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
 import { useOperations } from '@/lib/operations';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 type ModelVersionCreateResult = {
   modelVersion: {
@@ -27,7 +29,7 @@ const parseList = (value: string) =>
     .map((item) => item.trim())
     .filter(Boolean);
 
-export function NewModelVersionForm({ projectId }: { projectId: string }) {
+export function NewModelVersionForm({ projectId, role }: { projectId: string; role: EffectiveRole }) {
   const [modelId, setModelId] = useState('');
   const [version, setVersion] = useState('');
   const [runId, setRunId] = useState('');
@@ -37,6 +39,7 @@ export function NewModelVersionForm({ projectId }: { projectId: string }) {
   const [result, setResult] = useState<ModelVersionCreateResult | null>(null);
   const [error, setError] = useState<GatewayAPIError | null>(null);
   const { addOperation, updateOperation } = useOperations();
+  const allowed = can(role, 'model:write');
 
   const submit = async () => {
     if (!projectId) {
@@ -135,13 +138,14 @@ export function NewModelVersionForm({ projectId }: { projectId: string }) {
             <Label htmlFor="idem">Idempotency-Key</Label>
             <Input id="idem" value={idempotencyKey} onChange={(event) => setIdempotencyKey(event.target.value)} />
           </div>
-          <Button variant="default" size="sm" onClick={submit} disabled={!projectId}>
+          <Button variant="default" size="sm" onClick={submit} disabled={!projectId || !allowed}>
             Создать версию
           </Button>
+          <PolicyHint allowed={allowed} capability="model:write" />
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {result ? (
         <Card>

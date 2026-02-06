@@ -7,13 +7,14 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Breadcrumbs } from '@/components/console/breadcrumbs';
 import { OperationsPanel } from '@/components/console/operations-panel';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { OperationsProvider } from '@/lib/operations';
 import { cn } from '@/lib/utils';
 import { ProjectProvider, useProjectContext } from '@/lib/project-context';
-import { deriveEffectiveRole, roleLabel } from '@/lib/rbac';
+import { can, deriveEffectiveRole, roleLabel, type Capability } from '@/lib/rbac';
 import type { GatewaySession } from '@/lib/session';
 
 export type NavItem = {
@@ -48,12 +49,12 @@ const navSections: NavSection[] = [
   },
 ];
 
-const quickActions = [
-  { label: 'Новый Run', href: '/console/runs/new' },
-  { label: 'Новый PipelineRun', href: '/console/pipelines/new' },
-  { label: 'Новый EnvLock', href: '/console/environments/new-lock' },
-  { label: 'Новый DevEnv', href: '/console/devenvs/new' },
-  { label: 'Новая версия модели', href: '/console/models/new-version' },
+const quickActions: Array<{ label: string; href: string; capability: Capability }> = [
+  { label: 'Новый Run', href: '/console/runs/new', capability: 'run:write' },
+  { label: 'Новый PipelineRun', href: '/console/pipelines/new', capability: 'run:write' },
+  { label: 'Новый EnvLock', href: '/console/environments/new-lock', capability: 'env:write' },
+  { label: 'Новый DevEnv', href: '/console/devenvs/new', capability: 'devenv:write' },
+  { label: 'Новая версия модели', href: '/console/models/new-version', capability: 'model:write' },
 ];
 
 const isActive = (href: string, pathname: string | null) => {
@@ -150,16 +151,27 @@ function TopBar({ session }: { session: GatewaySession }) {
             <div className="absolute right-0 mt-2 w-64 rounded-lg border border-border/70 bg-card p-3 shadow-glow-sm">
               <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Запуск</div>
               <div className="flex flex-col gap-2">
-                {quickActions.map((action) => (
-                  <Link
-                    key={action.href}
-                    href={action.href}
-                    className="rounded-md border border-border/60 px-3 py-2 text-sm hover:bg-muted/40"
-                    onClick={() => setShowQuick(false)}
-                  >
-                    {action.label}
-                  </Link>
-                ))}
+                {quickActions.map((action) => {
+                  const allowed = can(effectiveRole, action.capability);
+                  return (
+                    <div key={action.href} className="space-y-1">
+                      {allowed ? (
+                        <Link
+                          href={action.href}
+                          className="rounded-md border border-border/60 px-3 py-2 text-sm hover:bg-muted/40"
+                          onClick={() => setShowQuick(false)}
+                        >
+                          {action.label}
+                        </Link>
+                      ) : (
+                        <div className="rounded-md border border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                          {action.label}
+                        </div>
+                      )}
+                      <PolicyHint allowed={allowed} capability={action.capability} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ) : null}

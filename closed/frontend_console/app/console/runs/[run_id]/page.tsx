@@ -9,7 +9,10 @@ import { Table, TableContainer, TableEmpty } from '@/components/ui/table';
 import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
 import { formatDateTime } from '@/lib/format';
+import { stringifySafe } from '@/lib/sanitize';
 import { getActiveProjectId } from '@/lib/server-context';
+import { getGatewaySession } from '@/lib/session';
+import { deriveEffectiveRole } from '@/lib/rbac';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 import { RunActions } from './run-actions';
@@ -21,6 +24,8 @@ type Params = {
 export default async function RunDetailPage({ params }: { params: Params }) {
   const projectId = getActiveProjectId();
   const runId = params.run_id;
+  const session = await getGatewaySession();
+  const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   let runSpec: components['schemas']['ProjectRunGetResponse'] | null = null;
   let events: components['schemas']['ExperimentRunEventListResponse'] | null = null;
   let error: GatewayAPIError | null = null;
@@ -71,7 +76,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
         </Card>
       ) : null}
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {runSpec ? (
         <>
@@ -120,7 +125,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
             </CardContent>
           </Card>
 
-          <RunActions projectId={projectId} runId={runId} />
+          <RunActions projectId={projectId} runId={runId} role={role} />
 
           <PageSection title="Inputs" description="Исходные данные и параметры неизменяемого запуска.">
             <Card>
@@ -157,7 +162,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
                 <CardDescription>Спецификация шагов и графа исполнения.</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(runSpec.runSpec.pipelineSpec, null, 2)}</pre>
+                <pre className="text-xs whitespace-pre-wrap">{stringifySafe(runSpec.runSpec.pipelineSpec)}</pre>
               </CardContent>
             </Card>
 
@@ -167,7 +172,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
                 <CardDescription>Привязка версий наборов данных.</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(runSpec.runSpec.datasetBindings, null, 2)}</pre>
+                <pre className="text-xs whitespace-pre-wrap">{stringifySafe(runSpec.runSpec.datasetBindings)}</pre>
               </CardContent>
             </Card>
 
@@ -177,7 +182,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
                 <CardDescription>Параметры конфигурации запуска.</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(runSpec.runSpec.parameters, null, 2)}</pre>
+                <pre className="text-xs whitespace-pre-wrap">{stringifySafe(runSpec.runSpec.parameters)}</pre>
               </CardContent>
             </Card>
           </PageSection>
@@ -229,7 +234,7 @@ export default async function RunDetailPage({ params }: { params: Params }) {
                 <CardDescription>Зафиксированные политики в момент создания RunSpec.</CardDescription>
               </CardHeader>
               <CardContent>
-                <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(runSpec.runSpec.policySnapshot, null, 2)}</pre>
+                <pre className="text-xs whitespace-pre-wrap">{stringifySafe(runSpec.runSpec.policySnapshot)}</pre>
               </CardContent>
             </Card>
           </PageSection>

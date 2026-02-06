@@ -8,6 +8,7 @@ import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
 import { getActiveProjectId } from '@/lib/server-context';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
+import { stringifySafe } from '@/lib/sanitize';
 
 import { PipelineSelector } from './pipeline-selector';
 
@@ -95,7 +96,7 @@ export default async function PipelinesPage({ searchParams }: { searchParams: Se
         </div>
       </PageSection>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {runSpec ? (
         <PageSection title="DAG и шаги">
@@ -106,9 +107,7 @@ export default async function PipelinesPage({ searchParams }: { searchParams: Se
               <CardDescription>Полное описание графа, зафиксированное в RunSpec.</CardDescription>
             </CardHeader>
             <CardContent>
-              <pre className="text-xs whitespace-pre-wrap">
-                {JSON.stringify(runSpec.runSpec.pipelineSpec ?? {}, null, 2)}
-              </pre>
+              <pre className="text-xs whitespace-pre-wrap">{stringifySafe(runSpec.runSpec.pipelineSpec ?? {})}</pre>
             </CardContent>
           </Card>
         </PageSection>

@@ -37,8 +37,13 @@ export function roleLabel(role: EffectiveRole): string {
 }
 
 export type Capability =
+  | 'dataset:read'
+  | 'dataset:write'
+  | 'artifact:read'
   | 'devenv:read'
   | 'devenv:write'
+  | 'env:read'
+  | 'env:write'
   | 'run:read'
   | 'run:write'
   | 'run:approve'
@@ -48,6 +53,45 @@ export type Capability =
   | 'model:export'
   | 'audit:read'
   | 'ops:read';
+
+export function capabilityLabel(capability: Capability): string {
+  switch (capability) {
+    case 'dataset:read':
+      return 'DatasetRead';
+    case 'dataset:write':
+      return 'DatasetWrite';
+    case 'artifact:read':
+      return 'ArtifactRead';
+    case 'devenv:read':
+      return 'DevEnvRead';
+    case 'devenv:write':
+      return 'DevEnvWrite';
+    case 'env:read':
+      return 'EnvRead';
+    case 'env:write':
+      return 'EnvWrite';
+    case 'run:read':
+      return 'RunRead';
+    case 'run:write':
+      return 'RunWrite';
+    case 'run:approve':
+      return 'RunApprove';
+    case 'model:read':
+      return 'ModelRead';
+    case 'model:write':
+      return 'ModelWrite';
+    case 'model:approve':
+      return 'ModelApprove';
+    case 'model:export':
+      return 'ModelExport';
+    case 'audit:read':
+      return 'AuditRead';
+    case 'ops:read':
+      return 'OpsRead';
+    default:
+      return 'RBAC';
+  }
+}
 
 export function can(role: EffectiveRole, capability: Capability): boolean {
   if (role === 'admin') {

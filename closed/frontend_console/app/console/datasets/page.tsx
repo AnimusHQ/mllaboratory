@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { PageHeader, PageSection, PageShell } from '@/components/ui/page-shell';
 import { GatewayAPIError } from '@/lib/gateway-client';
 import type { components } from '@/lib/gateway-openapi';
+import { deriveEffectiveRole } from '@/lib/rbac';
+import { getGatewaySession } from '@/lib/session';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 const copy = {
@@ -23,6 +25,8 @@ export default async function DatasetsPage({ searchParams }: { searchParams: Sea
   let versions: components['schemas']['DatasetVersion'][] = [];
   let error: GatewayAPIError | null = null;
   const datasetId = searchParams.dataset_id?.trim() ?? '';
+  const session = await getGatewaySession();
+  const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 
   try {
     const data = await gatewayServerFetchJSON<components['schemas']['DatasetListResponse']>(
@@ -47,10 +51,10 @@ export default async function DatasetsPage({ searchParams }: { searchParams: Sea
     <PageShell>
       <PageHeader title={copy.title} description={copy.description} />
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       <PageSection title="Регистрация набора">
-        <DatasetCreateForm />
+        <DatasetCreateForm role={role} />
       </PageSection>
 
       <PageSection title="Список наборов данных">
@@ -66,8 +70,8 @@ export default async function DatasetsPage({ searchParams }: { searchParams: Sea
       <PageSection title="Версии набора" description="Загрузка и управление версионными объектами.">
         {datasetId ? (
           <>
-            <DatasetUploadForm datasetId={datasetId} />
-            <DatasetVersionsTable versions={versions} />
+            <DatasetUploadForm datasetId={datasetId} role={role} />
+            <DatasetVersionsTable versions={versions} role={role} />
           </>
         ) : (
           <Card>

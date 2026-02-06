@@ -2,14 +2,17 @@
 
 import { useState } from 'react';
 
-import { ErrorState } from '@/components/console/error-state';
 import { CopyButton } from '@/components/console/copy-button';
+import { ErrorState } from '@/components/console/error-state';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
+import { stringifySafe } from '@/lib/sanitize';
 import { useOperations } from '@/lib/operations';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 type DispatchResponse = {
   runId: string;
@@ -20,7 +23,7 @@ type DispatchResponse = {
   dpBaseUrl?: string;
 };
 
-export function RunActions({ projectId, runId }: { projectId: string; runId: string }) {
+export function RunActions({ projectId, runId, role }: { projectId: string; runId: string; role: EffectiveRole }) {
   const [error, setError] = useState<GatewayAPIError | null>(null);
   const [plan, setPlan] = useState<Record<string, unknown> | null>(null);
   const [dryRun, setDryRun] = useState<Record<string, unknown> | null>(null);
@@ -28,6 +31,8 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
   const [bundle, setBundle] = useState<Record<string, unknown> | null>(null);
   const [idempotency, setIdempotency] = useState('');
   const { addOperation, updateOperation } = useOperations();
+  const canWrite = can(role, 'run:write');
+  const canRead = can(role, 'run:read');
 
   const invoke = async (
     action: string,
@@ -96,6 +101,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
                   setPlan(response as Record<string, unknown>);
                 })
               }
+              disabled={!canWrite}
             >
               Построить план
             </Button>
@@ -110,6 +116,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
                   setDryRun(response as Record<string, unknown>);
                 })
               }
+              disabled={!canWrite}
             >
               Dry‑run
             </Button>
@@ -139,6 +146,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
                   },
                 )
               }
+              disabled={!canWrite}
             >
               Диспетчеризировать
             </Button>
@@ -156,6 +164,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
                   setBundle(response as Record<string, unknown>);
                 })
               }
+              disabled={!canRead}
             >
               Reproducibility bundle
             </Button>
@@ -163,10 +172,12 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
           <div className="text-xs text-muted-foreground">
             Отмена выполнения доступна только через DP‑контур. В консоли отражаются статусы и планирование.
           </div>
+          <PolicyHint allowed={canWrite} capability="run:write" />
+          <PolicyHint allowed={canRead} capability="run:read" />
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {dispatch ? (
         <Card>
@@ -194,7 +205,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
             <CardDescription>Сводка шагов и состояния.</CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(plan, null, 2)}</pre>
+            <pre className="text-xs whitespace-pre-wrap">{stringifySafe(plan)}</pre>
           </CardContent>
         </Card>
       ) : null}
@@ -206,7 +217,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
             <CardDescription>Проверка доступности ресурсов без фактического запуска.</CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(dryRun, null, 2)}</pre>
+            <pre className="text-xs whitespace-pre-wrap">{stringifySafe(dryRun)}</pre>
           </CardContent>
         </Card>
       ) : null}
@@ -218,7 +229,7 @@ export function RunActions({ projectId, runId }: { projectId: string; runId: str
             <CardDescription>JSON‑снимок входов и policy snapshot.</CardDescription>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(bundle, null, 2)}</pre>
+            <pre className="text-xs whitespace-pre-wrap">{stringifySafe(bundle)}</pre>
           </CardContent>
         </Card>
       ) : null}

@@ -73,7 +73,7 @@ export default async function OpsPage() {
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       <PageSection title="Health probes">
         <Card>

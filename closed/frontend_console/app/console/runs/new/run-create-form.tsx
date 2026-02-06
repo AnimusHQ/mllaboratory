@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { ErrorState } from '@/components/console/error-state';
 import { CopyButton } from '@/components/console/copy-button';
+import { PolicyHint } from '@/components/console/policy-hint';
 import { StatusPill } from '@/components/console/status-pill';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
 import { useOperations } from '@/lib/operations';
+import { can, type EffectiveRole } from '@/lib/rbac';
 
 type RunCreateResult = {
   runId: string;
@@ -51,7 +53,7 @@ const parseJSON = (value: string) => {
   return JSON.parse(value);
 };
 
-export function RunCreateForm({ projectId }: { projectId: string }) {
+export function RunCreateForm({ projectId, role }: { projectId: string; role: EffectiveRole }) {
   const [form, setForm] = useState<FormState>(initialState);
   const [error, setError] = useState<GatewayAPIError | null>(null);
   const [result, setResult] = useState<RunCreateResult | null>(null);
@@ -60,6 +62,7 @@ export function RunCreateForm({ projectId }: { projectId: string }) {
   const { addOperation, updateOperation } = useOperations();
 
   const ready = useMemo(() => projectId.trim().length > 0, [projectId]);
+  const allowed = useMemo(() => can(role, 'run:write'), [role]);
 
   const updateField = (key: keyof FormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setForm((prev) => ({ ...prev, [key]: event.target.value }));
@@ -214,15 +217,16 @@ export function RunCreateForm({ projectId }: { projectId: string }) {
           {fieldError ? <div className="text-sm text-rose-200">Ошибка формы: {fieldError}</div> : null}
 
           <div className="flex flex-wrap gap-3">
-            <Button variant="default" size="sm" onClick={submit} disabled={!ready || busy}>
+            <Button variant="default" size="sm" onClick={submit} disabled={!ready || busy || !allowed}>
               Создать RunSpec
             </Button>
             <span className="text-xs text-muted-foreground">Данные фиксируются; изменения возможны только через новую версию.</span>
           </div>
+          <PolicyHint allowed={allowed} capability="run:write" />
         </CardContent>
       </Card>
 
-      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} /> : null}
+      {error ? <ErrorState code={error.code} requestId={error.requestId} status={error.status} details={error.details} message={error.message} retryable={error.retryable} /> : null}
 
       {result ? (
         <Card>
