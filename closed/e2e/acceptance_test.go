@@ -183,8 +183,13 @@ func TestE2EFullStack(t *testing.T) {
 			deliveryID := firstWebhookDeliveryID(t, client, cfg.experimentsURL(), state.ProjectID, "RunFinished")
 			replayWebhookDelivery(t, client, cfg.experimentsURL(), state.ProjectID, deliveryID, "replay-token")
 			replayWebhookDelivery(t, client, cfg.experimentsURL(), state.ProjectID, deliveryID, "replay-token")
+			conflict := postTerminalWithState(t, client, cfg.experimentsURL(), state.ProjectID, state.RunID, "term-fail-"+state.RunID, "failed")
+			if conflict != http.StatusConflict {
+				t.Fatalf("expected invalid transition conflict, got %d", conflict)
+			}
 			waitForAuditDLQ(t, client, cfg.auditURL(), 1, 45*time.Second)
-			replayAuditDLQ(t, client, cfg.auditURL())
+			replayAuditDLQWithToken(t, client, cfg.auditURL(), "audit-replay-token")
+			replayAuditDLQWithToken(t, client, cfg.auditURL(), "audit-replay-token")
 		})
 	}
 
@@ -557,20 +562,25 @@ func postHeartbeat(t *testing.T, client *http.Client, baseURL, projectID, runID,
 }
 
 func postTerminal(t *testing.T, client *http.Client, baseURL, projectID, runID, eventID string) {
+	status := postTerminalWithState(t, client, baseURL, projectID, runID, eventID, "succeeded")
+	if status != http.StatusOK {
+		t.Fatalf("terminal status=%d", status)
+	}
+}
+
+func postTerminalWithState(t *testing.T, client *http.Client, baseURL, projectID, runID, eventID, state string) int {
 	now := time.Now().UTC()
 	payload := map[string]any{
 		"eventId":    eventID,
 		"runId":      runID,
 		"projectId":  projectID,
-		"state":      "succeeded",
+		"state":      state,
 		"emittedAt":  now.Format(time.RFC3339Nano),
 		"finishedAt": now.Format(time.RFC3339Nano),
 	}
 	url := fmt.Sprintf("%s/internal/cp/runs/%s/terminal", baseURL, runID)
 	resp := doJSON(t, client, http.MethodPost, url, payload, projectID)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("terminal status=%d body=%s", resp.StatusCode, resp.Body)
-	}
+	return resp.StatusCode
 }
 
 func postArtifactCommitted(t *testing.T, client *http.Client, baseURL, projectID, runID, eventID string) {
@@ -817,7 +827,7 @@ func waitForAuditDLQ(t *testing.T, client *http.Client, baseURL string, minCount
 	t.Fatalf("timeout waiting for audit DLQ")
 }
 
-func replayAuditDLQ(t *testing.T, client *http.Client, baseURL string) {
+func replayAuditDLQWithToken(t *testing.T, client *http.Client, baseURL, token string) {
 	url := fmt.Sprintf("%s/admin/audit/exports/deliveries?status=dlq", baseURL)
 	resp := doRequest(t, client, http.MethodGet, url, nil, "")
 	if resp.StatusCode != http.StatusOK {
@@ -833,7 +843,7 @@ func replayAuditDLQ(t *testing.T, client *http.Client, baseURL string) {
 		t.Fatalf("expected at least one dlq delivery")
 	}
 	replayURL := fmt.Sprintf("%s/admin/audit/exports/dlq/%d:replay", baseURL, out.Deliveries[0].DeliveryID)
-	resp = doJSONWithIdempotency(t, client, http.MethodPost, replayURL, map[string]any{}, "", "replay-"+uuid.NewString())
+	resp = doJSONWithIdempotency(t, client, http.MethodPost, replayURL, map[string]any{}, "", token)
 	if resp.StatusCode != http.StatusAccepted {
 		t.Fatalf("replay status=%d body=%s", resp.StatusCode, resp.Body)
 	}
