@@ -6,7 +6,7 @@ import { getGatewaySession } from '@/lib/session';
 import { NewModelVersionForm } from './new-version-form';
 
 export default async function NewModelVersionPage() {
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 

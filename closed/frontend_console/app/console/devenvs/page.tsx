@@ -62,16 +62,17 @@ type SearchParams = {
   page?: string;
 };
 
-export default async function DevEnvsPage({ searchParams }: { searchParams: SearchParams }) {
-  const projectId = getActiveProjectId();
+export default async function DevEnvsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   const canWrite = can(role, 'devenv:write');
   let environments: components['schemas']['DevEnvironment'][] = [];
   let error: GatewayAPIError | null = null;
-  const query = searchParams.q?.toLowerCase().trim() ?? '';
-  const stateFilter = searchParams.state?.toLowerCase().trim() ?? '';
-  const pageRaw = Number(searchParams.page ?? '1');
+  const query = params.q?.toLowerCase().trim() ?? '';
+  const stateFilter = params.state?.toLowerCase().trim() ?? '';
+  const pageRaw = Number(params.page ?? '1');
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
   if (projectId) {

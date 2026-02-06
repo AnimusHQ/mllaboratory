@@ -21,9 +21,10 @@ type Params = {
   run_id: string;
 };
 
-export default async function RunDetailPage({ params }: { params: Params }) {
-  const projectId = getActiveProjectId();
-  const runId = params.run_id;
+export default async function RunDetailPage({ params }: { params?: Promise<Params> }) {
+  const routeParams = (await params) ?? { run_id: '' };
+  const projectId = await getActiveProjectId();
+  const runId = routeParams.run_id;
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   let runSpec: components['schemas']['ProjectRunGetResponse'] | null = null;

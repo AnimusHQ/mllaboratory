@@ -1,14 +1,6 @@
 import type { Metadata, Viewport } from 'next';
-import { JetBrains_Mono, Space_Grotesk } from 'next/font/google';
 
 import './globals.css';
-
-const mono = JetBrains_Mono({ subsets: ['latin', 'cyrillic'], variable: '--font-mono' });
-const sans = Space_Grotesk({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  fallback: ['Inter', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif'],
-});
 
 const metadataBase = new URL(
   process.env.NEXT_PUBLIC_SITE_URL ??
@@ -30,7 +22,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" data-surface="ops" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="ru" data-surface="ops">
       <body data-surface="ops">{children}</body>
     </html>
   );

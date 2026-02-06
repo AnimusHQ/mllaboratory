@@ -1,8 +1,8 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { buildDevEnvProxyUrl } from '@/lib/devenv';
-import { formatDurationSeconds } from '@/lib/format';
+import { buildDevEnvProxyUrl } from '../lib/devenv';
+import { formatDurationSeconds } from '../lib/format';
 
 test('buildDevEnvProxyUrl prefixes gateway base and experiments proxy', () => {
   process.env.NEXT_PUBLIC_GATEWAY_URL = 'https://gateway.example';

@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { paginateLineageEdges, paginateLineageNodes, sortLineageEdges, sortLineageNodes } from '@/lib/lineage';
+import { paginateLineageEdges, paginateLineageNodes, sortLineageEdges, sortLineageNodes } from '../lib/lineage';
 
 test('sortLineageNodes orders by type then id', () => {
   const nodes = [

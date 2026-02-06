@@ -63,12 +63,13 @@ type SearchParams = {
   q?: string;
 };
 
-export default async function EnvironmentsPage({ searchParams }: { searchParams: SearchParams }) {
-  const projectId = getActiveProjectId();
+export default async function EnvironmentsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   const canWrite = can(role, 'env:write');
-  const query = searchParams.q?.toLowerCase().trim() ?? '';
+  const query = params.q?.toLowerCase().trim() ?? '';
   let definitions: components['schemas']['EnvironmentDefinition'][] = [];
   let locks: components['schemas']['EnvironmentLock'][] = [];
   let verifications: components['schemas']['ImageVerificationRecord'][] = [];
@@ -79,7 +80,7 @@ export default async function EnvironmentsPage({ searchParams }: { searchParams:
       const defs = await gatewayServerFetchJSON<components['schemas']['EnvironmentDefinitionListResponse']>(
         `/api/experiments/projects/${projectId}/environment-definitions?limit=200`,
       );
-      definitions = defs.environments ?? [];
+      definitions = defs.definitions ?? [];
       const locksResponse = await gatewayServerFetchJSON<components['schemas']['EnvironmentLockListResponse']>(
         `/api/experiments/projects/${projectId}/environment-locks?limit=200`,
       );

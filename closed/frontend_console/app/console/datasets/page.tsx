@@ -20,11 +20,12 @@ type SearchParams = {
   dataset_id?: string;
 };
 
-export default async function DatasetsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function DatasetsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
   let datasets: components['schemas']['Dataset'][] = [];
   let versions: components['schemas']['DatasetVersion'][] = [];
   let error: GatewayAPIError | null = null;
-  const datasetId = searchParams.dataset_id?.trim() ?? '';
+  const datasetId = params.dataset_id?.trim() ?? '';
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 

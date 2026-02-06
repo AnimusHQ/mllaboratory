@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { buildProjectCookie, persistProjectId, readProjectIdFromStorage } from '@/lib/project-context';
+import { buildProjectCookie, persistProjectId, readProjectIdFromStorage } from '../lib/project-context';
 
 test('readProjectIdFromStorage prefers local storage value', () => {
   const cookie = 'animus_project_id=from-cookie; path=/';

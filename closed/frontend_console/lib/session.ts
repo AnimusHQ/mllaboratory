@@ -14,7 +14,7 @@ export type GatewaySession =
   | { mode: 'error'; error: string };
 
 export async function getGatewaySession(): Promise<GatewaySession> {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
   try {
@@ -30,8 +30,10 @@ export async function getGatewaySession(): Promise<GatewaySession> {
       roles: session.roles ?? [],
     };
   } catch (err) {
-    if (err instanceof GatewayAPIError && err.status === 401) {
-      return { mode: 'unauthenticated' };
+    if (err instanceof GatewayAPIError) {
+      if (err.status === 401) {
+        return { mode: 'unauthenticated' };
+      }
     }
     return { mode: 'error', error: 'gateway_session_unavailable' };
   }

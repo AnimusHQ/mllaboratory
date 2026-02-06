@@ -9,7 +9,7 @@
     "lint": "node node_modules/next/dist/bin/next lint",
     "typecheck": "node node_modules/typescript/bin/tsc --noEmit",
     "test:build": "rm -rf dist-test && node node_modules/typescript/bin/tsc -p tsconfig.test.json",
-    "test": "npm run -s test:build && node --test dist-test/test/**/*.test.js",
+    "test": "npm run -s test:build && node --require ./scripts/register-test-paths.cjs --test dist-test/test/**/*.test.js",
     "generate:gateway": "go run ./scripts/generate-gateway-client.go"
   },
   "dependencies": {

@@ -69,11 +69,14 @@ export async function gatewayFetch(path: string, init: GatewayFetchOptions = {})
 }
 
 export async function gatewayFetchJSON<T>(path: string, init: GatewayFetchOptions = {}): Promise<T> {
-  const res = await gatewayFetch(path, init);
+  const requestId =
+    init.requestId ??
+    (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `req-${Date.now()}`);
+  const res = await gatewayFetch(path, { ...init, requestId });
   if (res.status === 204) {
     return undefined as T;
   }
-  const requestId = res.headers.get('X-Request-Id') ?? undefined;
+  const responseRequestId = res.headers.get('X-Request-Id') ?? undefined;
   const contentType = res.headers.get('Content-Type') ?? '';
   if (res.ok) {
     if (!contentType.includes('application/json')) {
@@ -96,7 +99,7 @@ export async function gatewayFetchJSON<T>(path: string, init: GatewayFetchOption
     (errorPayload?.message as string) ??
     (errorPayload?.detail as string) ??
     (typeof errorPayload === 'string' ? errorPayload : undefined);
-  const requestIdFinal = (errorPayload?.request_id as string) ?? requestId;
+  const requestIdFinal = (errorPayload?.request_id as string) ?? responseRequestId ?? requestId;
   const retryable =
     (typeof errorPayload?.retryable === 'boolean' ? (errorPayload.retryable as boolean) : undefined) ??
     isRetryableStatus(res.status);

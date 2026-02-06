@@ -6,7 +6,7 @@ import { getGatewaySession } from '@/lib/session';
 import { NewLockForm } from './new-lock-form';
 
 export default async function NewLockPage() {
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 

@@ -6,7 +6,7 @@ import { getActiveProjectId } from '@/lib/server-context';
 import { RunCreateForm } from './run-create-form';
 
 export default async function NewRunPage() {
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 

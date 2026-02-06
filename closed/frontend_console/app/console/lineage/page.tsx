@@ -54,9 +54,10 @@ type SearchParams = {
   model_version_id?: string;
 };
 
-export default async function LineagePage({ searchParams }: { searchParams: SearchParams }) {
-  const runId = searchParams.run_id?.trim() ?? '';
-  const modelVersionId = searchParams.model_version_id?.trim() ?? '';
+export default async function LineagePage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
+  const runId = params.run_id?.trim() ?? '';
+  const modelVersionId = params.model_version_id?.trim() ?? '';
   let graph: components['schemas']['SubgraphResponse'] | null = null;
   let error: GatewayAPIError | null = null;
 

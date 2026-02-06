@@ -66,16 +66,17 @@ type SearchParams = {
   page?: string;
 };
 
-export default async function RunsPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function RunsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
   const canWrite = can(role, 'run:write');
   let runs: components['schemas']['ExperimentRun'][] = [];
   let error: GatewayAPIError | null = null;
 
-  const statusFilter = searchParams.status?.trim();
-  const query = searchParams.q?.trim().toLowerCase() ?? '';
-  const pageRaw = Number(searchParams.page ?? '1');
+  const statusFilter = params.status?.trim();
+  const query = params.q?.trim().toLowerCase() ?? '';
+  const pageRaw = Number(params.page ?? '1');
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
 
   try {
@@ -123,7 +124,7 @@ export default async function RunsPage({ searchParams }: { searchParams: SearchP
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const slice = sorted.slice((safePage - 1) * pageSize, safePage * pageSize);
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
 
   return (
     <PageShell>

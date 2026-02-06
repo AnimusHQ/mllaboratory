@@ -57,9 +57,10 @@ type SearchParams = {
   run_id?: string;
 };
 
-export default async function PipelinesPage({ searchParams }: { searchParams: SearchParams }) {
-  const projectId = getActiveProjectId();
-  const runId = searchParams.run_id?.trim() ?? '';
+export default async function PipelinesPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
+  const projectId = await getActiveProjectId();
+  const runId = params.run_id?.trim() ?? '';
   let runSpec: components['schemas']['ProjectRunGetResponse'] | null = null;
   let error: GatewayAPIError | null = null;
 

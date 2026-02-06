@@ -1,7 +1,9 @@
 import { strict as assert } from 'node:assert';
 import { afterEach, test } from 'node:test';
 
-import { GatewayAPIError, gatewayFetchJSON } from '@/lib/gateway-client';
+import { GatewayAPIError, gatewayFetchJSON } from '../lib/gateway-client';
+
+const isGatewayError = (err: unknown): err is GatewayAPIError => err instanceof GatewayAPIError;
 
 afterEach(() => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,8 +32,7 @@ test('gatewayFetchJSON surfaces ErrorResponse with request_id', async () => {
 
   await assert.rejects(
     () => gatewayFetchJSON('/bad'),
-    (err: unknown) =>
-      err instanceof GatewayAPIError && err.code === 'VALIDATION_FAILED' && err.requestId === 'req-2',
+    (err: unknown) => isGatewayError(err) && err.code === 'VALIDATION_FAILED' && err.requestId === 'req-2',
   );
 });
 
@@ -46,7 +47,7 @@ test('gatewayFetchJSON marks retryable errors and propagates message', async () 
   await assert.rejects(
     () => gatewayFetchJSON('/unavailable', { requestId: 'req-503' }),
     (err: unknown) =>
-      err instanceof GatewayAPIError &&
+      isGatewayError(err) &&
       err.code === 'UPSTREAM_UNAVAILABLE' &&
       err.message === 'Downstream timeout' &&
       err.requestId === 'req-503' &&
@@ -65,7 +66,7 @@ test('gatewayFetchJSON marks non-retryable 4xx', async () => {
   await assert.rejects(
     () => gatewayFetchJSON('/bad', { requestId: 'req-422' }),
     (err: unknown) =>
-      err instanceof GatewayAPIError &&
+      isGatewayError(err) &&
       err.code === 'VALIDATION_FAILED' &&
       err.message === 'bad input' &&
       err.requestId === 'req-422' &&

@@ -68,14 +68,15 @@ type SearchParams = {
   page?: string;
 };
 
-export default async function ModelsPage({ searchParams }: { searchParams: SearchParams }) {
-  const projectId = getActiveProjectId();
+export default async function ModelsPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
-  const query = searchParams.q?.toLowerCase().trim() ?? '';
-  const statusFilter = searchParams.status?.toLowerCase().trim() ?? '';
-  const modelId = searchParams.model_id?.trim() ?? '';
-  const pageRaw = Number(searchParams.page ?? '1');
+  const query = params.q?.toLowerCase().trim() ?? '';
+  const statusFilter = params.status?.toLowerCase().trim() ?? '';
+  const modelId = params.model_id?.trim() ?? '';
+  const pageRaw = Number(params.page ?? '1');
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1;
   let models: components['schemas']['Model'][] = [];
   let versions: components['schemas']['ModelVersion'][] = [];

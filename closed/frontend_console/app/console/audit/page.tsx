@@ -64,18 +64,19 @@ type SearchParams = {
   attempts_page?: string;
 };
 
-export default async function AuditPage({ searchParams }: { searchParams: SearchParams }) {
+export default async function AuditPage({ searchParams }: { searchParams?: Promise<SearchParams> }) {
+  const params = (await searchParams) ?? {};
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
-  const query = searchParams.q?.toLowerCase().trim() ?? '';
-  const deliveryStatus = searchParams.delivery_status?.trim() ?? '';
-  const deliveryId = searchParams.delivery_id?.trim() ?? '';
-  const eventsPage = Number(searchParams.events_page ?? '1') || 1;
-  const deliveriesPage = Number(searchParams.deliveries_page ?? '1') || 1;
-  const attemptsPage = Number(searchParams.attempts_page ?? '1') || 1;
+  const query = params.q?.toLowerCase().trim() ?? '';
+  const deliveryStatus = params.delivery_status?.trim() ?? '';
+  const deliveryId = params.delivery_id?.trim() ?? '';
+  const eventsPage = Number(params.events_page ?? '1') || 1;
+  const deliveriesPage = Number(params.deliveries_page ?? '1') || 1;
+  const attemptsPage = Number(params.attempts_page ?? '1') || 1;
   let events: components['schemas']['AuditEvent'][] = [];
   let deliveries: components['schemas']['ExportDelivery'][] = [];
-  let attempts: components['schemas']['ExportDeliveryAttempt'][] = [];
+  let attempts: components['schemas']['ExportAttempt'][] = [];
   let error: GatewayAPIError | null = null;
 
   try {
@@ -92,7 +93,7 @@ export default async function AuditPage({ searchParams }: { searchParams: Search
     );
     deliveries = deliveryResponse.deliveries ?? [];
     if (deliveryId) {
-      const attemptsResponse = await gatewayServerFetchJSON<components['schemas']['ExportDeliveryAttemptListResponse']>(
+      const attemptsResponse = await gatewayServerFetchJSON<components['schemas']['ExportAttemptListResponse']>(
         `/api/audit/admin/audit/exports/deliveries/${deliveryId}/attempts?limit=200`,
       );
       attempts = attemptsResponse.attempts ?? [];

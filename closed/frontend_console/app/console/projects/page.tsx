@@ -9,7 +9,7 @@ import { getActiveProjectId } from '@/lib/server-context';
 import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 
 export default async function ProjectsPage() {
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
   let bindings: components['schemas']['RoleBindingListResponse'] | null = null;
   let error: GatewayAPIError | null = null;
 

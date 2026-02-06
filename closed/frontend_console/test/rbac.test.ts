@@ -1,7 +1,7 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
 
-import { can } from '@/lib/rbac';
+import { can } from '../lib/rbac';
 
 test('rbac gating respects role capability mapping', () => {
   assert.equal(can('viewer', 'run:read'), true);

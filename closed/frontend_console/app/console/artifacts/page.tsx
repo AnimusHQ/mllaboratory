@@ -13,11 +13,12 @@ import { gatewayServerFetchJSON } from '@/lib/server-gateway';
 export default async function ArtifactsPage({
   searchParams,
 }: {
-  searchParams?: { run_id?: string };
+  searchParams?: Promise<{ run_id?: string }>;
 }) {
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
-  const runId = searchParams?.run_id?.trim() ?? '';
+  const params = (await searchParams) ?? {};
+  const runId = params.run_id?.trim() ?? '';
   let data: components['schemas']['ExperimentRunArtifactListResponse'] | null = null;
   let error: GatewayAPIError | null = null;
 

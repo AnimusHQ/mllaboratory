@@ -6,7 +6,7 @@ import { getGatewaySession } from '@/lib/session';
 import { NewDevEnvForm } from './new-devenv-form';
 
 export default async function NewDevEnvPage() {
-  const projectId = getActiveProjectId();
+  const projectId = await getActiveProjectId();
   const session = await getGatewaySession();
   const role = deriveEffectiveRole(session.mode === 'authenticated' ? session.roles : []);
 
