@@ -11,6 +11,7 @@ import { PolicyHint } from '@/components/console/policy-hint';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { requiresAuthGate } from '@/lib/auth/auth-gate';
 import { getGatewayLoginUrl } from '@/lib/auth/login-url';
 import { OperationsProvider } from '@/lib/operations';
 import { cn } from '@/lib/utils';
@@ -182,6 +183,31 @@ function TopBar({ session }: { session: GatewaySession }) {
   );
 }
 
+function AuthRequired({ loginUrl }: { loginUrl: string }) {
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <div className="console-surface w-full max-w-lg p-8">
+          <div className="console-section-title">Доступ к консоли</div>
+          <h1 className="mt-3 text-2xl font-semibold">Авторизация требуется</h1>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Для работы в контрольной плоскости требуется активная сессия Gateway. Выполните вход и вернитесь к
+            запрошенному разделу.
+          </p>
+          <div className="mt-6">
+            <Link href={loginUrl} className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+              Войти
+            </Link>
+          </div>
+          <div className="mt-4 text-xs text-muted-foreground">
+            Если вход не открывается, проверьте адрес Gateway и сетевой доступ.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell({ session, children }: { session: GatewaySession; children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -193,6 +219,10 @@ export function AppShell({ session, children }: { session: GatewaySession; child
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
   const loginUrl = useMemo(() => getGatewayLoginUrl(returnTo), [returnTo]);
+
+  if (requiresAuthGate(session)) {
+    return <AuthRequired loginUrl={loginUrl} />;
+  }
 
   return (
     <ProjectProvider>
@@ -233,19 +263,6 @@ export function AppShell({ session, children }: { session: GatewaySession; child
               </nav>
             </aside>
             <main className="px-8 py-6">
-              {session.mode === 'unauthenticated' ? (
-                <div className="mb-6 rounded-lg border border-amber-400/40 bg-card p-4 text-sm">
-                  <div className="font-semibold text-amber-200">Сессия не обнаружена</div>
-                  <div className="mt-2 text-muted-foreground">
-                    Для доступа требуется аутентификация через Gateway. Перейдите к началу входа и повторите запрос.
-                  </div>
-                  <div className="mt-3">
-                    <Link href={loginUrl} className="text-sm font-semibold text-primary">
-                      Перейти к входу через Gateway
-                    </Link>
-                  </div>
-                </div>
-              ) : null}
               {session.mode === 'error' ? (
                 <div className="mb-6 rounded-lg border border-rose-400/40 bg-card p-4 text-sm">
                   <div className="font-semibold text-rose-200">Сбой проверки сессии</div>
