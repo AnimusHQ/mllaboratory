@@ -98,7 +98,7 @@ func (s *OIDCService) LoginHandler() (http.HandlerFunc, error) {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		returnTo := safeReturnTo(r.URL.Query().Get("return_to"))
+		returnTo := SafeReturnTo(r.URL.Query().Get("return_to"), s.cfg)
 
 		state, err := randomBase64URL(32)
 		if err != nil {
@@ -154,7 +154,7 @@ func (s *OIDCService) CallbackHandler() (http.HandlerFunc, error) {
 
 		codeVerifier := tokenFromCookie(r, "animus_oidc_verifier")
 		nonceCookie := tokenFromCookie(r, "animus_oidc_nonce")
-		returnTo := safeReturnTo(tokenFromCookie(r, "animus_return_to"))
+		returnTo := SafeReturnTo(tokenFromCookie(r, "animus_return_to"), s.cfg)
 		if codeVerifier == "" || nonceCookie == "" {
 			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "missing_pkce_or_nonce"})
 			return
@@ -309,24 +309,67 @@ func pkceS256Challenge(verifier string) string {
 	return base64.RawURLEncoding.EncodeToString(sum[:])
 }
 
-func safeReturnTo(raw string) string {
-	if raw == "" {
-		return "/"
+func SafeReturnTo(raw string, cfg Config) string {
+	defaultPath := "/console"
+	if strings.TrimSpace(raw) == "" {
+		return defaultPath
 	}
 	u, err := url.Parse(raw)
 	if err != nil {
-		return "/"
+		return defaultPath
 	}
 	if u.IsAbs() {
-		return "/"
+		if !isAllowedReturnToOrigin(u, cfg) {
+			return defaultPath
+		}
+		return u.String()
 	}
 	if !strings.HasPrefix(u.Path, "/") {
-		return "/"
+		return defaultPath
 	}
 	if strings.HasPrefix(u.Path, "//") {
-		return "/"
+		return defaultPath
+	}
+	if u.RawQuery != "" {
+		return u.Path + "?" + u.RawQuery
 	}
 	return u.Path
+}
+
+func isAllowedReturnToOrigin(u *url.URL, cfg Config) bool {
+	origin := strings.ToLower(strings.TrimSpace(u.Scheme + "://" + u.Host))
+	if origin == "" {
+		return false
+	}
+	allowed := allowedReturnToOrigins(cfg)
+	_, ok := allowed[origin]
+	return ok
+}
+
+func allowedReturnToOrigins(cfg Config) map[string]struct{} {
+	out := make(map[string]struct{})
+	if strings.TrimSpace(cfg.PublicBaseURL) != "" {
+		if origin := parseOrigin(cfg.PublicBaseURL); origin != "" {
+			out[origin] = struct{}{}
+		}
+	}
+	for _, raw := range cfg.AllowedReturnToOrigins {
+		if origin := parseOrigin(raw); origin != "" {
+			out[origin] = struct{}{}
+		}
+	}
+	return out
+}
+
+func parseOrigin(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return ""
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return ""
+	}
+	return strings.ToLower(parsed.Scheme + "://" + parsed.Host)
 }
 
 func setShortCookie(w http.ResponseWriter, name string, value string, cfg Config) {

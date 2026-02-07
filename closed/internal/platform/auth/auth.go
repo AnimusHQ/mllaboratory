@@ -23,9 +23,9 @@ var ErrUnauthenticated = errors.New("unauthenticated")
 type Config struct {
 	Mode Mode
 
-	RolesClaim string
+	RolesClaim  string
 	GroupsClaim string
-	EmailClaim string
+	EmailClaim  string
 
 	SessionCookieName     string
 	SessionCookieSecure   bool
@@ -40,6 +40,9 @@ type Config struct {
 	OIDCClientSecret string
 	OIDCRedirectURL  string
 	OIDCScopes       []string
+
+	PublicBaseURL          string
+	AllowedReturnToOrigins []string
 
 	DevSubject string
 	DevEmail   string
@@ -84,25 +87,27 @@ func ConfigFromEnv() (Config, error) {
 	}
 
 	cfg := Config{
-		Mode:                  mode,
-		RolesClaim:            env.String("AUTH_ROLES_CLAIM", "roles"),
-		GroupsClaim:           env.String("AUTH_GROUPS_CLAIM", "groups"),
-		EmailClaim:            env.String("AUTH_EMAIL_CLAIM", "email"),
-		SessionCookieName:     env.String("AUTH_SESSION_COOKIE_NAME", "animus_session"),
-		SessionCookieSecure:   sessionCookieSecure,
-		SessionCookieMaxAge:   time.Duration(maxAgeSeconds) * time.Second,
-		SessionCookieSameSite: env.String("AUTH_SESSION_COOKIE_SAMESITE", "Lax"),
-		SessionMaxConcurrent:  sessionMaxConcurrent,
-		RBACAllowDirectRoles:  rbacAllowDirect,
-		GroupRoleMap:          groupRoleMap,
-		OIDCIssuerURL:         env.String("OIDC_ISSUER_URL", ""),
-		OIDCClientID:          env.String("OIDC_CLIENT_ID", ""),
-		OIDCClientSecret:      env.String("OIDC_CLIENT_SECRET", ""),
-		OIDCRedirectURL:       env.String("OIDC_REDIRECT_URL", ""),
-		OIDCScopes:            parseScopes(env.String("OIDC_SCOPES", "openid profile email")),
-		DevSubject:            env.String("DEV_AUTH_SUBJECT", "dev-user"),
-		DevEmail:              env.String("DEV_AUTH_EMAIL", "dev-user@example.local"),
-		DevRoles:              parseCSV(env.String("DEV_AUTH_ROLES", "admin")),
+		Mode:                   mode,
+		RolesClaim:             env.String("AUTH_ROLES_CLAIM", "roles"),
+		GroupsClaim:            env.String("AUTH_GROUPS_CLAIM", "groups"),
+		EmailClaim:             env.String("AUTH_EMAIL_CLAIM", "email"),
+		SessionCookieName:      env.String("AUTH_SESSION_COOKIE_NAME", "animus_session"),
+		SessionCookieSecure:    sessionCookieSecure,
+		SessionCookieMaxAge:    time.Duration(maxAgeSeconds) * time.Second,
+		SessionCookieSameSite:  env.String("AUTH_SESSION_COOKIE_SAMESITE", "Lax"),
+		SessionMaxConcurrent:   sessionMaxConcurrent,
+		RBACAllowDirectRoles:   rbacAllowDirect,
+		GroupRoleMap:           groupRoleMap,
+		OIDCIssuerURL:          env.String("OIDC_ISSUER_URL", ""),
+		OIDCClientID:           env.String("OIDC_CLIENT_ID", ""),
+		OIDCClientSecret:       env.String("OIDC_CLIENT_SECRET", ""),
+		OIDCRedirectURL:        env.String("OIDC_REDIRECT_URL", ""),
+		OIDCScopes:             parseScopes(env.String("OIDC_SCOPES", "openid profile email")),
+		PublicBaseURL:          strings.TrimSpace(env.String("ANIMUS_PUBLIC_BASE_URL", "")),
+		AllowedReturnToOrigins: parseCSV(env.String("ANIMUS_ALLOWED_RETURN_TO_ORIGINS", "")),
+		DevSubject:             env.String("DEV_AUTH_SUBJECT", "dev-user"),
+		DevEmail:               env.String("DEV_AUTH_EMAIL", "dev-user@example.local"),
+		DevRoles:               parseCSV(env.String("DEV_AUTH_ROLES", "admin")),
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
