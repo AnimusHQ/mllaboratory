@@ -89,6 +89,16 @@ func main() {
 			return requiredRoleForDatasetRegistry(r)
 		},
 	}
+	authorize := func(r *http.Request, identity auth.Identity) error {
+		if r != nil && r.URL.Path == "/projects" && (r.Method == http.MethodPost || r.Method == http.MethodGet) {
+			clone := r.Clone(r.Context())
+			clone.Header = clone.Header.Clone()
+			clone.Header.Del("X-Project-Id")
+			clone.Header.Del("X-Project-ID")
+			r = clone
+		}
+		return authorizer.Authorize(r, identity)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", httpserver.Healthz("dataset-registry"))
@@ -166,7 +176,7 @@ func main() {
 	handler := auth.Middleware{
 		Logger:         logger,
 		Authenticator:  headersAuth,
-		Authorize:      authorizer.Authorize,
+		Authorize:      authorize,
 		ProjectResolve: projectResolver,
 		Audit: func(ctx context.Context, event auth.DenyEvent) error {
 			auditCtx, cancel := context.WithTimeout(ctx, 750*time.Millisecond)
