@@ -49,6 +49,27 @@ if ! check_code "${PUBLIC_BASE_URL}/" "200"; then
   exit 1
 fi
 
+me_tmp="$(mktemp)"
+me_code="$(curl -s -o "$me_tmp" -w '%{http_code}' "${PUBLIC_BASE_URL}/api/auth/me" || true)"
+if [[ "$me_code" == "200" ]]; then
+  if ! grep -q '"user_id"' "$me_tmp"; then
+    if grep -q '"service":"gateway"' "$me_tmp"; then
+      echo "health-check: /api/auth/me unexpected response (gateway image likely outdated)" >&2
+    else
+      echo "health-check: /api/auth/me unexpected payload" >&2
+    fi
+    cat "$me_tmp" >&2 || true
+    rm -f "$me_tmp"
+    exit 1
+  fi
+elif [[ "$me_code" != "401" ]]; then
+  echo "health-check: /api/auth/me returned ${me_code} (expected 401 or 200)" >&2
+  cat "$me_tmp" >&2 || true
+  rm -f "$me_tmp"
+  exit 1
+fi
+rm -f "$me_tmp"
+
 console_code="$(curl -s -o /dev/null -w '%{http_code}' "${PUBLIC_BASE_URL}/console" || true)"
 if [[ "$console_code" != "302" ]]; then
   echo "health-check: /console returned ${console_code} (expected 302)" >&2

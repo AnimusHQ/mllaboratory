@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CACHE_DIR="${ROOT_DIR}/.cache"
+STARTUP_RETRIES="${ANIMUS_SYSTEM_STARTUP_RETRIES:-3}"
 
 require_bin() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -62,6 +63,39 @@ sync_chart_migrations() {
     exit 1
   fi
   cp "${files[@]}" "$CHART_WORK_DIR/migrations/"
+}
+
+stop_pf() {
+  local pid_file="$1"
+  if [[ -f "$pid_file" ]]; then
+    local pid
+    pid="$(cat "$pid_file" || true)"
+    if [[ -n "$pid" ]] && kill -0 "$pid" >/dev/null 2>&1; then
+      if ps -p "$pid" -o comm= 2>/dev/null | grep -q kubectl; then
+        kill "$pid" >/dev/null 2>&1 || true
+      fi
+    fi
+    rm -f "$pid_file"
+  fi
+}
+
+ensure_port_forward() {
+  local target="$1"
+  local port="$2"
+  local pid_file="$3"
+  local log_file="$4"
+  local attempts=0
+  while [[ "$attempts" -lt "$STARTUP_RETRIES" ]]; do
+    attempts=$((attempts + 1))
+    stop_pf "$pid_file"
+    kubectl -n "$NAMESPACE" port-forward --address 0.0.0.0 "$target" "$port" >"$log_file" 2>&1 &
+    echo $! >"$pid_file"
+    if "$ROOT_DIR/scripts/wait_port.sh" 127.0.0.1 "$(echo "$port" | cut -d: -f1)" 30 >/dev/null; then
+      return
+    fi
+  done
+  echo "system-prod-up: port-forward failed for ${target} on ${port}" >&2
+  exit 1
 }
 
 cat >"$VALUES_FILE" <<EOFVALUES
@@ -165,27 +199,11 @@ kubectl -n "$NAMESPACE" set env deployment/"${DATAPLANE_FULLNAME}" \
 
 "$ROOT_DIR/scripts/system_wait.sh"
 
-start_port_forward() {
-  local target="$1"
-  local port="$2"
-  local pid_file="$3"
-  local log_file="$4"
-  if [[ -f "$pid_file" ]]; then
-    if kill -0 "$(cat "$pid_file")" >/dev/null 2>&1; then
-      return
-    fi
-  fi
-  kubectl -n "$NAMESPACE" port-forward --address 0.0.0.0 "$target" "$port" >"$log_file" 2>&1 &
-  echo $! >"$pid_file"
-}
-
-start_port_forward "svc/${DATAPILOT_FULLNAME}-gateway" "${GATEWAY_PORT}:8080" \
+ensure_port_forward "svc/${DATAPILOT_FULLNAME}-gateway" "${GATEWAY_PORT}:8080" \
   "$CACHE_DIR/system_gateway_pf.pid" "$CACHE_DIR/system_gateway_pf.log"
-"$ROOT_DIR/scripts/wait_port.sh" 127.0.0.1 "$GATEWAY_PORT" 30 >/dev/null
 
-start_port_forward "svc/${DATAPILOT_FULLNAME}-postgres" "${POSTGRES_PORT}:5432" \
+ensure_port_forward "svc/${DATAPILOT_FULLNAME}-postgres" "${POSTGRES_PORT}:5432" \
   "$CACHE_DIR/system_postgres_pf.pid" "$CACHE_DIR/system_postgres_pf.log"
-"$ROOT_DIR/scripts/wait_port.sh" 127.0.0.1 "$POSTGRES_PORT" 30 >/dev/null
 
 if [[ "$UI_ENABLED" != "1" ]]; then
   kubectl -n "$NAMESPACE" delete deployment "${DATAPILOT_FULLNAME}-ui" --ignore-not-found >/dev/null 2>&1 || true
