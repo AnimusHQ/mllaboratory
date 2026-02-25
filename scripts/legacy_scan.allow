@@ -1,0 +1,8 @@
+# Allow references in deprecation policy metadata.
+docs/architecture/deprecation-policy\.md
+
+# Allow the legacy contracts shim stub readme reference.
+open[/]api/README\.md
+
+# Allow the legacy deploy shim stub readme reference.
+closed[/]deploy/README\.md
