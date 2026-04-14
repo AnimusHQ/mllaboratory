@@ -20,7 +20,7 @@ export function OperationsPanel() {
   }
 
   return (
-    <Card className="border border-border/70">
+    <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-4">
         <div>
           <CardTitle>Фоновые операции</CardTitle>
@@ -37,15 +37,18 @@ export function OperationsPanel() {
           {operations.map((operation) => {
             const meta = statusLabel[operation.status] ?? statusLabel.pending;
             return (
-              <div key={operation.id} className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-3">
+              <div
+                key={operation.id}
+                className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/12 bg-white/5 px-4 py-3"
+              >
                 <div className="min-w-[240px]">
                   <div className="text-sm font-semibold">{operation.label}</div>
-                  <div className="text-xs text-muted-foreground">
+                  <div className="text-xs text-white/60">
                     Создано: {formatDateTime(operation.createdAt)} · Обновлено: {formatDateTime(operation.updatedAt ?? operation.createdAt)}
                   </div>
-                  {operation.details ? <div className="text-xs text-muted-foreground">Контекст: {operation.details}</div> : null}
+                  {operation.details ? <div className="text-xs text-white/60">Контекст: {operation.details}</div> : null}
                   {operation.poll ? (
-                    <div className="text-xs text-muted-foreground">Авто‑проверка: каждые 8с</div>
+                    <div className="text-xs text-white/60">Авто‑проверка: каждые 8с</div>
                   ) : null}
                 </div>
                 <div className="flex items-center gap-2">

@@ -51,19 +51,27 @@ body[data-surface='ops'] {
 
 @layer components {
   .console-surface {
-    @apply bg-card text-card-foreground border border-border rounded-lg;
+    @apply border text-card-foreground;
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(11, 22, 38, 0.9);
+    border-radius: 28px;
+    box-shadow: 0 28px 60px rgba(4, 10, 20, 0.6);
   }
 
   .console-section-title {
-    @apply text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-xs font-semibold uppercase;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.6);
   }
 
   .console-kicker {
-    @apply text-xs uppercase tracking-[0.24em] text-muted-foreground;
+    @apply text-xs uppercase;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.6);
   }
 
   .console-divider {
-    @apply border-t border-border/80;
+    @apply border-t border-white/12;
   }
 
   .console-table {
@@ -71,14 +79,27 @@ body[data-surface='ops'] {
   }
 
   .console-table th {
-    @apply sticky top-0 bg-card text-left text-xs uppercase tracking-[0.2em] text-muted-foreground py-3 px-3 border-b border-border;
+    @apply sticky top-0 text-left py-3 px-3 border-b;
+    background: rgba(11, 22, 38, 0.95);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   .console-table td {
-    @apply py-3 px-3 border-b border-border/60 align-top;
+    @apply py-3 px-3 border-b align-top;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
   }
 
   .console-pill {
-    @apply inline-flex items-center gap-2 rounded-full border border-border/80 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em];
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.8);
   }
 }

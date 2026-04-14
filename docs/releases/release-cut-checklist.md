@@ -11,13 +11,20 @@
 4. `./scripts/go_test.sh ./closed/...`
 5. `make integrations-test`
 6. `make dr-validate` (ожидаемый no‑op без `ANIMUS_DR_VALIDATE=1`)
+7. Проверить отсутствие новых legacy-path ссылок: `make legacy-scan`
+8. Для release candidate включить fail-mode: `ANIMUS_LEGACY_SCAN_FAIL=1 make legacy-scan`
 
 ## 3. Supply‑chain гейты
-1. `make sbom`
-2. `make vuln-scan`
-3. `make supply-chain`
-4. `make sast-scan` (только при `ANIMUS_SAST_SCAN=1`)
-5. `make dep-scan` (только при `ANIMUS_DEP_SCAN=1`)
+1. `make images-build`
+2. `make sbom`
+3. `make sbom-check`
+4. `make sign-images`
+5. `make verify-images`
+6. `make repro-check`
+7. `make vuln-scan`
+8. `make supply-chain`
+9. `make sast-scan` (только при `ANIMUS_SAST_SCAN=1`)
+10. `make dep-scan` (только при `ANIMUS_DEP_SCAN=1`)
 
 ## 4. Минимальные smoke‑проверки
 1. `/healthz` и `/readyz` для gateway, experiments, dataset‑registry, audit.

@@ -522,11 +522,7 @@ if ! wait_for_health "${ANIMUS_USERSPACE_URL}/healthz" "${HEALTH_TIMEOUT_SECONDS
   exit 1
 fi
 
-if ! "${ROOT_DIR}/closed/scripts/migrate.sh" up; then
-  echo "migrations failed" >&2
-  mark_golden_failed
-  exit 1
-fi
+echo "==> migrations are managed by service startup in demo compose"
 
 REQUEST_ID="${ANIMUS_DEMO_REQUEST_ID:-demo-$(date -u +%Y%m%dT%H%M%SZ)}"
 NAME_SUFFIX="${ANIMUS_DEMO_SUFFIX:-$(date -u +%Y%m%d%H%M%S)}"
@@ -637,13 +633,49 @@ if [ -z "${UPLOAD_URL}" ]; then
 fi
 http_put_file "${UPLOAD_URL}" "${ARTIFACT_FILE}" "text/plain"
 
+banner "Create environment definition"
+echo "==> create environment definition"
+env_def_body=$(http_request "POST" "${API_BASE}/experiments/projects/${PROJECT_ID}/environment-definitions" \
+  "{\"name\":\"demo-env-${NAME_SUFFIX}\",\"description\":\"Deterministic demo environment\",\"baseImages\":[{\"name\":\"runtime\",\"ref\":\"ghcr.io/animus/demo-runtime:1.0.0\"}]}" \
+  "application/json" "X-Request-Id: ${REQUEST_ID}" "${PROJECT_HEADER}")
+ENVIRONMENT_DEFINITION_ID="$(printf "%s" "${env_def_body}" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("definition", {}).get("environmentDefinitionId", ""))' 2>/dev/null || true)"
+if [ -z "${ENVIRONMENT_DEFINITION_ID}" ]; then
+  ENVIRONMENT_DEFINITION_ID="$(printf "%s" "${env_def_body}" | tr -d '\n' | sed -n 's/.*"environmentDefinitionId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+fi
+if [ -z "${ENVIRONMENT_DEFINITION_ID}" ]; then
+  echo "environmentDefinitionId missing" >&2
+  mark_golden_failed
+  exit 1
+fi
+if [ "${GOLDEN_MODE}" = "1" ]; then
+  echo "environment_definition_id=${ENVIRONMENT_DEFINITION_ID}"
+fi
+
+banner "Create environment lock"
+echo "==> create environment lock"
+env_lock_body=$(http_request "POST" "${API_BASE}/experiments/projects/${PROJECT_ID}/environment-locks" \
+  "{\"environmentDefinitionId\":\"${ENVIRONMENT_DEFINITION_ID}\",\"imageDigests\":{\"runtime\":\"sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\"}}" \
+  "application/json" "X-Request-Id: ${REQUEST_ID}" "${PROJECT_HEADER}")
+ENV_LOCK_ID="$(printf "%s" "${env_lock_body}" | python3 -c 'import json,sys; data=json.load(sys.stdin); print(data.get("lock", {}).get("lockId", ""))' 2>/dev/null || true)"
+if [ -z "${ENV_LOCK_ID}" ]; then
+  ENV_LOCK_ID="$(printf "%s" "${env_lock_body}" | tr -d '\n' | sed -n 's/.*"lockId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p')"
+fi
+if [ -z "${ENV_LOCK_ID}" ]; then
+  echo "lockId missing" >&2
+  mark_golden_failed
+  exit 1
+fi
+if [ "${GOLDEN_MODE}" = "1" ]; then
+  echo "environment_lock_id=${ENV_LOCK_ID}"
+fi
+
 PIPELINE_SPEC=$(cat <<'JSON'
 {"apiVersion":"animus/v1alpha1","kind":"Pipeline","specVersion":"1.0","spec":{"steps":[{"name":"prepare","image":"ghcr.io/animus/demo@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","command":["/bin/true"],"args":[],"inputs":{"datasets":[],"artifacts":[]},"outputs":{"artifacts":[{"name":"prepared","type":"dataset"}]},"env":[],"resources":{"cpu":"1","memory":"512Mi","gpu":0},"retryPolicy":{"maxAttempts":1,"backoff":{"type":"fixed","initialSeconds":0,"maxSeconds":0,"multiplier":1}}},{"name":"train","image":"ghcr.io/animus/demo@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","command":["/bin/true"],"args":[],"inputs":{"datasets":[{"name":"training","datasetRef":"training_data"}],"artifacts":[{"name":"prepared","fromStep":"prepare","artifact":"prepared"}]},"outputs":{"artifacts":[{"name":"model","type":"model"}]},"env":[{"name":"SEED","value":"1337"}],"resources":{"cpu":"2","memory":"1Gi","gpu":0},"retryPolicy":{"maxAttempts":2,"backoff":{"type":"fixed","initialSeconds":1,"maxSeconds":1,"multiplier":1}}}],"dependencies":[{"from":"prepare","to":"train"}]}}
 JSON
 )
 
 RUN_REQUEST=$(cat <<JSON
-{"idempotencyKey":"${REQUEST_ID}","pipelineSpec":${PIPELINE_SPEC},"datasetBindings":{"training_data":"${DATASET_VERSION_ID}"},"codeRef":{"repoUrl":"https://example.local/animus/demo.git","commitSha":"0123456789abcdef0123456789abcdef01234567"},"envLock":{"envHash":"demo-env-${NAME_SUFFIX}","envTemplateId":"demo"}}
+{"idempotencyKey":"${REQUEST_ID}","pipelineSpec":${PIPELINE_SPEC},"datasetBindings":{"training_data":"${DATASET_VERSION_ID}"},"codeRef":{"repoUrl":"https://example.local/animus/demo.git","commitSha":"0123456789abcdef0123456789abcdef01234567"},"envLock":{"lockId":"${ENV_LOCK_ID}"}}
 JSON
 )
 

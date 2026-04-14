@@ -4,10 +4,14 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/scripts/go_env.sh"
+# shellcheck source=/dev/null
+source "${ROOT_DIR}/scripts/lib/paths.sh"
+
+DEPLOY_DIR="$(animus_deploy_dir)"
 
 CHARTS=(
-  "${ROOT_DIR}/closed/deploy/helm/animus-datapilot"
-  "${ROOT_DIR}/closed/deploy/helm/animus-dataplane"
+  "${DEPLOY_DIR}/helm/animus-datapilot"
+  "${DEPLOY_DIR}/helm/animus-dataplane"
 )
 
 ARGS=()

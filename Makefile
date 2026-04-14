@@ -2,23 +2,33 @@ SHELL := /bin/bash
 
 GO ?= go
 PY ?= python3
-COMPOSE_BIN ?= docker compose -f closed/deploy/docker-compose.yml
+COMPOSE_BIN ?= docker compose -f open/demo/docker-compose.yml
+CANONICAL_UI_DIR ?= closed/ui
 
-PY_SDK_DIR ?= open/sdk/python
-PY_SDK_SUBMODULE ?= open/sdk
+# Repository layout documentation (path resolution is implemented in scripts/lib/paths.sh).
+CANONICAL_CONTRACTS_DIR ?= core/contracts
+CANONICAL_DEPLOY_DIR ?= deploy
+CANONICAL_ENTERPRISE_SCRIPTS_DIR ?= enterprise/scripts
+
+ANIMUS_CONTRACTS_DIR ?= $(CANONICAL_CONTRACTS_DIR)
+ANIMUS_DEPLOY_DIR ?= $(CANONICAL_DEPLOY_DIR)
+ANIMUS_ENTERPRISE_SCRIPTS_DIR ?= $(CANONICAL_ENTERPRISE_SCRIPTS_DIR)
+ANIMUS_SDK_DIR ?= sdk
+ANIMUS_SDK_REQUIRED ?= 0
+
 GO_PACKAGES ?= ./...
 LINT_BIN_DIR := $(CURDIR)/.bin
 GOLANGCI_LINT_VERSION ?= v1.64.8
 GOLANGCI_LINT_VERSION_STR ?= 1.64.8
 GOLANGCI_LINT ?= $(LINT_BIN_DIR)/golangci-lint
-GO_FILES := $(shell find . -type f -name '*.go' -not -path './.cache/*' -not -path './.git/*')
+GO_FILES := $(shell find . -type f -name '*.go' -not -path './.cache/*' -not -path './.git/*' -not -path './vendor/*' -not -path './*/node_modules/*' -not -path './*/dist-test/*')
 
 CACHE_DIR := $(CURDIR)/.cache
 export GOCACHE := $(CACHE_DIR)/go-build
 export GOMODCACHE := $(CACHE_DIR)/go-mod
 export GOTMPDIR := $(CACHE_DIR)/go-tmp
 
-.PHONY: bootstrap fmt test integrations-test dr-validate lint build openapi-lint openapi-compat guardrails-check dev demo demo-smoke demo-down e2e e2e-full system-test sbom vuln-scan supply-chain helm-images sast-scan dep-scan integration-up integration-down system-up system-down system-prod-up system-prod-down system-prod-health make-up-prod make-prod-up ui-build ui-test full-stack artifacts-collect images-build
+.PHONY: bootstrap fmt test integrations-test dr-validate lint build ci-baseline openapi-lint openapi-compat openapi-check openapi-baseline-update compat-check legacy-scan arch-check repro-check base-image-check policy-validate hygiene-check submodule-check sdk-path guardrails-check dev demo demo-smoke demo-down e2e e2e-full system-test sbom sbom-check sign-images verify-images vuln-scan supply-chain helm-images sast-scan dep-scan integration-up integration-down system-up system-down system-prod-up system-prod-down system-prod-health make-up-prod make-prod-up ui-build ui-test full-stack artifacts-collect images-build
 
 bootstrap:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"
@@ -51,17 +61,27 @@ lint:
 	fi
 	@$(GOLANGCI_LINT) run
 	@echo "==> python compileall"
-	@if [ ! -d "$(PY_SDK_DIR)/src" ]; then \
-		echo "Python SDK not found at $(PY_SDK_DIR)."; \
-		if [ "$(PY_SDK_DIR)" = "$(PY_SDK_SUBMODULE)/python" ] && [ -e .git ] && command -v git >/dev/null 2>&1; then \
-			echo "==> init submodule $(PY_SDK_SUBMODULE)"; \
-			git submodule update --init --recursive "$(PY_SDK_SUBMODULE)"; \
-		else \
-			echo "If you're using the submodule, run: git submodule update --init --recursive $(PY_SDK_SUBMODULE)"; \
+	@sdk_dir="$$(ANIMUS_SDK_DIR="$(ANIMUS_SDK_DIR)" $(MAKE) -s sdk-path 2>/dev/null || true)"; \
+	if [ -z "$$sdk_dir" ]; then \
+		if [ "$(ANIMUS_SDK_REQUIRED)" = "1" ]; then \
+			echo "SDK path resolution failed."; \
+			echo "Run: git submodule update --init --recursive sdk"; \
 			exit 1; \
 		fi; \
-	fi
-	@PYTHONPATH="$(PY_SDK_DIR)/src" $(PY) -m compileall -q "$(PY_SDK_DIR)/src"
+		echo "==> python compileall skipped (SDK path unresolved)"; \
+		exit 0; \
+	fi; \
+	py_sdk_dir="$$sdk_dir/python"; \
+	if [ ! -d "$$py_sdk_dir/src" ]; then \
+		if [ "$(ANIMUS_SDK_REQUIRED)" = "1" ]; then \
+			echo "Python SDK source not found at $$py_sdk_dir/src."; \
+			echo "Run: git submodule update --init --recursive sdk"; \
+			exit 1; \
+		fi; \
+		echo "==> python compileall skipped (SDK not initialized at $$py_sdk_dir/src)"; \
+		exit 0; \
+	fi; \
+	PYTHONPATH="$$py_sdk_dir/src" $(PY) -m compileall -q "$$py_sdk_dir/src"
 
 test:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"
@@ -82,17 +102,27 @@ test:
 		echo "==> integration tests skipped (set ANIMUS_INTEGRATION=1)"; \
 	fi
 	@echo "==> python tests"
-	@if [ ! -d "$(PY_SDK_DIR)/tests" ]; then \
-		echo "Python SDK tests not found at $(PY_SDK_DIR)/tests."; \
-		if [ "$(PY_SDK_DIR)" = "$(PY_SDK_SUBMODULE)/python" ] && [ -e .git ] && command -v git >/dev/null 2>&1; then \
-			echo "==> init submodule $(PY_SDK_SUBMODULE)"; \
-			git submodule update --init --recursive "$(PY_SDK_SUBMODULE)"; \
-		else \
-			echo "If you're using the submodule, run: git submodule update --init --recursive $(PY_SDK_SUBMODULE)"; \
+	@sdk_dir="$$(ANIMUS_SDK_DIR="$(ANIMUS_SDK_DIR)" $(MAKE) -s sdk-path 2>/dev/null || true)"; \
+	if [ -z "$$sdk_dir" ]; then \
+		if [ "$(ANIMUS_SDK_REQUIRED)" = "1" ]; then \
+			echo "SDK path resolution failed."; \
+			echo "Run: git submodule update --init --recursive sdk"; \
 			exit 1; \
 		fi; \
-	fi
-	@PYTHONPATH="$(PY_SDK_DIR)/src" $(PY) -m unittest discover -s "$(PY_SDK_DIR)/tests" -p 'test_*.py'
+		echo "==> python tests skipped (SDK path unresolved)"; \
+		exit 0; \
+	fi; \
+	py_sdk_dir="$$sdk_dir/python"; \
+	if [ ! -d "$$py_sdk_dir/tests" ]; then \
+		if [ "$(ANIMUS_SDK_REQUIRED)" = "1" ]; then \
+			echo "Python SDK tests not found at $$py_sdk_dir/tests."; \
+			echo "Run: git submodule update --init --recursive sdk"; \
+			exit 1; \
+		fi; \
+		echo "==> python tests skipped (SDK not initialized at $$py_sdk_dir/tests)"; \
+		exit 0; \
+	fi; \
+	PYTHONPATH="$$py_sdk_dir/src" $(PY) -m unittest discover -s "$$py_sdk_dir/tests" -p 'test_*.py'
 
 integrations-test:
 	@json_out=""; \
@@ -108,22 +138,22 @@ integration-down:
 	@./scripts/integration_down.sh
 
 ui-build:
-	@cd closed/frontend_console && NEXT_PUBLIC_SITE_URL="$${NEXT_PUBLIC_SITE_URL:-http://localhost:3001}" npm run build
+	@cd "$(CANONICAL_UI_DIR)" && npm ci --no-audit && npm run build
 
 ui-test:
-	@cd closed/frontend_console && NEXT_PUBLIC_SITE_URL="$${NEXT_PUBLIC_SITE_URL:-http://localhost:3001}" npm run test
+	@cd "$(CANONICAL_UI_DIR)" && npm ci --no-audit && npm run test
 
 images-build:
-	@./scripts/build_images.sh
+	@ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" ./scripts/build_images.sh
 
 system-up:
-	@./scripts/kind_up.sh
+	@ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" ./scripts/kind_up.sh
 
 system-down:
 	@./scripts/kind_down.sh
 
 system-prod-up:
-	@./scripts/system_prod_up.sh
+	@ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" ./scripts/system_prod_up.sh
 
 system-prod-down:
 	@./scripts/system_prod_down.sh
@@ -132,10 +162,10 @@ system-prod-health:
 	@./scripts/system_prod_health.sh
 
 make-up-prod:
-	@./scripts/system_prod_up.sh
+	@$(MAKE) system-prod-up
 
 make-prod-up:
-	@./scripts/system_prod_up.sh
+	@$(MAKE) system-prod-up
 
 full-stack:
 	@./scripts/full_stack.sh
@@ -149,27 +179,82 @@ dr-validate:
 		echo "dr-validate: ANIMUS_DR_VALIDATE not set; skipping."; \
 		exit 0; \
 	fi
-	@./closed/scripts/dr-validate.sh
+	@ANIMUS_ENTERPRISE_SCRIPTS_DIR="$(ANIMUS_ENTERPRISE_SCRIPTS_DIR)" ./enterprise/scripts/dr-validate.sh
 
 build:
 	@mkdir -p "$(GOCACHE)" "$(GOMODCACHE)" "$(GOTMPDIR)"
 	@echo "==> go build"
 	@$(GO) build $(GO_PACKAGES)
 
+ci-baseline: submodule-check hygiene-check lint build test helm-images openapi-check
+
 openapi-lint:
-	@./scripts/openapi_lint.sh
+	@ANIMUS_CONTRACTS_DIR="$(ANIMUS_CONTRACTS_DIR)" ./scripts/openapi_lint.sh
 
 openapi-compat:
-	@./scripts/openapi_breaking_check.sh
+	@ANIMUS_CONTRACTS_DIR="$(ANIMUS_CONTRACTS_DIR)" ./scripts/openapi_breaking_check.sh
+
+openapi-check: openapi-lint openapi-compat
+
+openapi-baseline-update:
+	@if [ "$$OPENAPI_BASELINE_UPDATE" != "1" ]; then \
+		echo "openapi-baseline-update: set OPENAPI_BASELINE_UPDATE=1"; \
+		exit 1; \
+	fi
+	@ANIMUS_CONTRACTS_DIR="$(ANIMUS_CONTRACTS_DIR)" OPENAPI_BASELINE_UPDATE=1 ./scripts/openapi_breaking_check.sh
+
+compat-check:
+	@ANIMUS_CONTRACTS_DIR="$(ANIMUS_CONTRACTS_DIR)" \
+	 ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" \
+	 ANIMUS_ENTERPRISE_SCRIPTS_DIR="$(ANIMUS_ENTERPRISE_SCRIPTS_DIR)" \
+	 ./scripts/compat_check.sh
+
+legacy-scan:
+	@./scripts/legacy_scan.sh
+
+arch-check:
+	@./scripts/arch_check.sh
+
+repro-check:
+	@CANONICAL_UI_DIR="$(CANONICAL_UI_DIR)" \
+	 ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" \
+	 ./scripts/repro_check.sh
+
+base-image-check:
+	@ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" ./scripts/base_image_check.sh
+
+policy-validate:
+	@GOFLAGS=-mod=vendor go run ./cmd/policy-validate \
+		--policy ./deploy/policy/kyverno-signed-images.yaml \
+		--signed ./deploy/policy/samples/pod-signed.yaml \
+		--unsigned ./deploy/policy/samples/pod-unsigned.yaml
+
+hygiene-check:
+	@./scripts/hygiene_check.sh
+
+submodule-check:
+	@./scripts/submodule_check.sh
+
+sdk-path:
+	@ANIMUS_SDK_DIR="$(ANIMUS_SDK_DIR)" bash -c 'source ./scripts/lib/paths.sh; animus_sdk_dir'
 
 guardrails-check:
 	@./scripts/precommit_guardrails.sh
 
 helm-images:
-	@./scripts/list_images.sh
+	@ANIMUS_DEPLOY_DIR="$(ANIMUS_DEPLOY_DIR)" ./scripts/list_images.sh
 
 sbom:
 	@./scripts/sbom.sh
+
+sbom-check:
+	@./scripts/sbom_check.sh
+
+sign-images:
+	@./scripts/sign_images.sh
+
+verify-images:
+	@./scripts/verify_images.sh
 
 vuln-scan:
 	@./scripts/vuln_scan.sh
@@ -192,13 +277,16 @@ e2e-full:
 system-test: e2e-full
 
 dev:
-	@COMPOSE_BIN="$(COMPOSE_BIN)" ./closed/scripts/dev.sh
+	@COMPOSE_BIN="$(COMPOSE_BIN)" ./scripts/dev.sh
 
 demo:
-	@ANIMUS_DEV_SKIP_UI=1 bash ./open/demo/quickstart.sh
+	@echo "DEPRECATED: use 'make dev' (demo target will be removed after 2 releases)" >&2
+	@$(MAKE) dev
 
 demo-smoke:
-	@ANIMUS_DEV_SKIP_UI=1 bash ./open/demo/quickstart.sh --smoke
+	@echo "DEPRECATED: use 'make dev DEV_ARGS=--smoke' (demo-smoke target will be removed after 2 releases)" >&2
+	@DEV_ARGS="--smoke" $(MAKE) dev
 
 demo-down:
-	@bash ./open/demo/quickstart.sh --down
+	@echo "DEPRECATED: use 'make dev DEV_ARGS=--down' (demo-down target will be removed after 2 releases)" >&2
+	@DEV_ARGS="--down" $(MAKE) dev

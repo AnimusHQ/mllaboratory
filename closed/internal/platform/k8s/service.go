@@ -14,8 +14,8 @@ type ServiceSpec struct {
 }
 
 type Service struct {
-	APIVersion string     `json:"apiVersion,omitempty"`
-	Kind       string     `json:"kind,omitempty"`
-	Metadata   ObjectMeta `json:"metadata"`
+	APIVersion string      `json:"apiVersion,omitempty"`
+	Kind       string      `json:"kind,omitempty"`
+	Metadata   ObjectMeta  `json:"metadata"`
 	Spec       ServiceSpec `json:"spec"`
 }

@@ -78,13 +78,13 @@ export function AuditDeliveryTable({ deliveries, role }: { deliveries: Delivery[
                 </td>
                 <td className="text-xs">
                   <div>sink: {delivery.sink_id}</div>
-                  <div className="text-muted-foreground">event: {delivery.event_id}</div>
+                  <div className="text-white/60">event: {delivery.event_id}</div>
                 </td>
                 <td>
                   <StatusPill status={delivery.status} />
                 </td>
                 <td className="text-xs">{delivery.attempt_count}</td>
-                <td className="text-xs text-muted-foreground">
+                <td className="text-xs text-white/60">
                   <div>Создано: {formatDateTime(delivery.created_at)}</div>
                   <div>Обновлено: {formatDateTime(delivery.updated_at)}</div>
                 </td>

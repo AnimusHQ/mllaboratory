@@ -36,10 +36,10 @@ func (t *oidcTestTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	switch req.URL.Path {
 	case "/.well-known/openid-configuration":
 		return jsonResponse(req, http.StatusOK, map[string]any{
-			"issuer":                  t.issuer,
-			"authorization_endpoint":  t.issuer + "/authorize",
-			"token_endpoint":          t.issuer + "/token",
-			"jwks_uri":                t.issuer + "/jwks",
+			"issuer":                   t.issuer,
+			"authorization_endpoint":   t.issuer + "/authorize",
+			"token_endpoint":           t.issuer + "/token",
+			"jwks_uri":                 t.issuer + "/jwks",
 			"response_types_supported": []string{"code"},
 		})
 	case "/jwks":
@@ -159,17 +159,17 @@ func TestOIDCLoginCallbackCreatesSession(t *testing.T) {
 	ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
 
 	cfg := Config{
-		Mode:                 ModeOIDC,
-		RolesClaim:           "roles",
-		EmailClaim:           "email",
-		SessionCookieName:    "animus_session",
-		SessionCookieMaxAge:  time.Hour,
+		Mode:                  ModeOIDC,
+		RolesClaim:            "roles",
+		EmailClaim:            "email",
+		SessionCookieName:     "animus_session",
+		SessionCookieMaxAge:   time.Hour,
 		SessionCookieSameSite: "Lax",
-		OIDCIssuerURL:        issuer,
-		OIDCClientID:         clientID,
-		OIDCClientSecret:     "secret",
-		OIDCRedirectURL:      "https://gateway.test/auth/callback",
-		OIDCScopes:           []string{"openid", "profile", "email"},
+		OIDCIssuerURL:         issuer,
+		OIDCClientID:          clientID,
+		OIDCClientSecret:      "secret",
+		OIDCRedirectURL:       "https://gateway.test/auth/callback",
+		OIDCScopes:            []string{"openid", "profile", "email"},
 	}
 	if err := cfg.Validate(); err != nil {
 		t.Fatalf("config validate: %v", err)

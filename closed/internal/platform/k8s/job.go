@@ -36,7 +36,7 @@ type EmptyDirVolumeSource struct {
 }
 
 type Volume struct {
-	Name     string               `json:"name"`
+	Name     string                `json:"name"`
 	EmptyDir *EmptyDirVolumeSource `json:"emptyDir,omitempty"`
 }
 

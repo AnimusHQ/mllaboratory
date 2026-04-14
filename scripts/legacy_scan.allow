@@ -1,8 +1,19 @@
+# owner=release-engineering expiry=2026-06-30 target-remove=v1.3
 # Allow references in deprecation policy metadata.
 docs/architecture/deprecation-policy\.md
 
+# owner=release-engineering expiry=2026-06-30 target-remove=v1.3
+# Allow references in top-level deprecation status summary.
+README\.md
+
+# owner=release-engineering expiry=2026-06-30 target-remove=v1.3
 # Allow the legacy contracts shim stub readme reference.
 open[/]api/README\.md
 
+# owner=release-engineering expiry=2026-06-30 target-remove=v1.3
 # Allow the legacy deploy shim stub readme reference.
 closed[/]deploy/README\.md
+
+# owner=release-engineering expiry=2026-06-30 target-remove=v1.3
+# Allow the legacy SDK shim stub readme reference.
+open[/]sdk/README\.md

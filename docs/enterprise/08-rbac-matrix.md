@@ -1,25 +1,20 @@
-# 08.2 RBAC Matrix
+# 08.2 Матрица RBAC
 
-## 08.2.1 Scope
+## 08.2.1 Область действия
+RBAC применяется в пределах Project и действует для всех доменных сущностей, что снижает риск межпроектного доступа. Default‑deny применяется при отсутствии явных прав, что снижает риск несанкционированных операций.
 
-RBAC is Project-scoped. Roles apply to all domain entities within a Project, with additional object-level constraints for Dataset, Run, Model, and Artifact.
+## 08.2.2 Минимальная семантика ролей
 
-Default deny applies when no explicit permission is present.
-
-## 08.2.2 Minimum role semantics
-
-| Role | Read APIs | Write APIs | Policy approvals |
+| Роль | Чтение | Запись | Одобрения политики |
 | --- | --- | --- | --- |
-| viewer | Y | N | N |
-| editor | Y | Y | N |
-| admin | Y | Y | Y |
+| viewer | да | нет | нет |
+| editor | да | да | нет |
+| admin | да | да | да |
 
-Notes:
+**Пояснения:**
+- Чтение включает просмотр и списки.
+- Запись включает создание, изменение, удаление и запуск.
+- Одобрения требуются там, где политика требует явного решения.
 
-- Read operations include retrieval and list operations.
-- Write operations include create, update, delete, and execute actions.
-- Policy approval is required where governance rules mandate explicit approval.
-
-## 08.2.3 Service accounts
-
-Service accounts are non-human principals used for automation and CI/CD. They must be assigned explicit Project roles and are subject to the same RBAC constraints as users.
+## 08.2.3 Сервисные аккаунты
+Сервисные аккаунты используются для автоматизации и получают явные роли, что снижает риск «скрытых» привилегий.

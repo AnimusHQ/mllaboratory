@@ -2,8 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+source "${ROOT_DIR}/scripts/lib/paths.sh"
 CACHE_DIR="${ROOT_DIR}/.cache"
 STARTUP_RETRIES="${ANIMUS_SYSTEM_STARTUP_RETRIES:-3}"
+DEPLOY_DIR="$(animus_deploy_dir)"
 
 require_bin() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -34,10 +37,16 @@ CONSOLE_DEV="${ANIMUS_CONSOLE_DEV:-1}"
 BUILD_IMAGES="${ANIMUS_SYSTEM_BUILD_IMAGES:-1}"
 IMAGE_TAG="${ANIMUS_IMAGE_TAG:-}"
 AUTH_MODE="${ANIMUS_AUTH_MODE:-oidc}"
-TRAINING_EXECUTOR="${ANIMUS_SYSTEM_TRAINING_EXECUTOR:-kubernetes}"
+TRAINING_EXECUTOR="${ANIMUS_SYSTEM_TRAINING_EXECUTOR:-disabled}"
 TRAINING_NAMESPACE="${ANIMUS_SYSTEM_TRAINING_NAMESPACE:-${NAMESPACE}}"
 TRAINING_JOB_TTL="${ANIMUS_SYSTEM_TRAINING_JOB_TTL_SECONDS:-3600}"
 TRAINING_JOB_SA="${ANIMUS_SYSTEM_TRAINING_JOB_SERVICE_ACCOUNT:-}"
+
+TRAINING_EXECUTOR_LOWER="$(echo "${TRAINING_EXECUTOR}" | tr '[:upper:]' '[:lower:]')"
+if [[ "${TRAINING_EXECUTOR_LOWER}" != "" && "${TRAINING_EXECUTOR_LOWER}" != "disabled" ]]; then
+  echo "system-prod-up: ANIMUS_SYSTEM_TRAINING_EXECUTOR must be disabled for production profile" >&2
+  exit 1
+fi
 
 HOST_IP="${ANIMUS_HOST_IP:-}"
 if [[ -z "$HOST_IP" ]]; then
@@ -53,7 +62,7 @@ CONSOLE_UPSTREAM_URL="${ANIMUS_CONSOLE_UPSTREAM_URL:-http://${HOST_IP}:3001}"
 
 mkdir -p "$CACHE_DIR"
 VALUES_FILE="${CACHE_DIR}/system_prod_values.yaml"
-CHART_DIR="${ROOT_DIR}/closed/deploy/helm/animus-datapilot"
+CHART_DIR="${DEPLOY_DIR}/helm/animus-datapilot"
 CHART_WORK_DIR="${CACHE_DIR}/animus-datapilot-chart"
 MIGRATIONS_SRC="${ROOT_DIR}/closed/migrations"
 
@@ -123,6 +132,7 @@ ensure_port_forward() {
 }
 
 cat >"$VALUES_FILE" <<EOFVALUES
+profile: production
 auth:
   mode: "${AUTH_MODE}"
   sessionCookieSecure: false
@@ -193,7 +203,7 @@ helm upgrade --install "$DATAPILOT_RELEASE" "$CHART_WORK_DIR" \
   -f "$VALUES_FILE" \
   --set auth.internalAuthSecret="$INTERNAL_AUTH_SECRET"
 
-helm upgrade --install "$DATAPLANE_RELEASE" "$ROOT_DIR/closed/deploy/helm/animus-dataplane" \
+helm upgrade --install "$DATAPLANE_RELEASE" "${DEPLOY_DIR}/helm/animus-dataplane" \
   --namespace "$NAMESPACE" \
   --create-namespace \
   --set auth.internalAuthSecret="$INTERNAL_AUTH_SECRET" \
@@ -253,8 +263,8 @@ start_console_dev() {
   fi
   require_bin node
   require_bin npm
-  if [[ ! -d "$ROOT_DIR/closed/frontend_console/node_modules" ]]; then
-    echo "console dev requires node_modules; run: (cd closed/frontend_console && npm ci)" >&2
+  if [[ ! -d "$ROOT_DIR/closed/ui/node_modules" ]]; then
+    echo "console dev requires node_modules; run: (cd closed/ui && npm ci)" >&2
     exit 1
   fi
   local pid_file="$CACHE_DIR/console-dev.pid"
@@ -264,7 +274,7 @@ start_console_dev() {
       return
     fi
   fi
-  (cd "$ROOT_DIR/closed/frontend_console" && \
+  (cd "$ROOT_DIR/closed/ui" && \
     NEXT_PUBLIC_SITE_URL="${PUBLIC_BASE_URL}" \
     NEXT_PUBLIC_GATEWAY_URL="${PUBLIC_BASE_URL}" \
     nohup npm run dev >"$log_file" 2>&1 & echo $! >"$pid_file")

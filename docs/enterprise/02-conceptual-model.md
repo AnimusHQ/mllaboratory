@@ -1,53 +1,43 @@
-# 02. Conceptual Model
+# 02. Концептуальная модель
 
-## 02.1 Digital laboratory for ML development
+## 02.1 Цифровая лаборатория
+Цифровая лаборатория фиксирует ML‑разработку как воспроизводимый процесс с формальными объектами, что снижает риск неуправляемого накопления артефактов и потери контекста.
 
-In the context of Animus, a digital laboratory is a managed computational and organizational environment in which ML development is conducted as a reproducible process with formal objects and verifiable properties.
+Лаборатория задаёт единый операционный контур, в котором:
+1. действия пользователя трактуются как операции над доменными сущностями, что снижает риск неявных изменений;
+2. все материальные зависимости фиксируются явно, что снижает риск «дрейфа» данных, кода и окружений;
+3. требования безопасности и аудита являются обязательными, что снижает риск несоответствия комплаенсу.
 
-The laboratory establishes a single operating context in which:
+## 02.2 Run как единица смысла
+`Run` является минимальной единицей исполнения и воспроизводимости, что снижает риск неоднозначной интерпретации результатов.
 
-1. developer actions are interpreted as operations on domain objects;
-2. all material dependencies are captured explicitly;
-3. security and audit requirements are enforced by the platform.
+`Run` определяется следующими входами:
+- проект;
+- `DatasetVersion` (одна или несколько);
+- `CodeRef` с `commit_sha`;
+- `EnvironmentLock`;
+- параметры исполнения;
+- `PolicySnapshot`.
 
-## 02.2 Run as a unit of meaning
+`Run` производит:
+- артефакты (логи, метрики, файлы, отчёты, веса моделей);
+- трассу исполнения;
+- `AuditEvent` для значимых операций и изменений статуса.
 
-Run (see Section 14) is used as the minimal unit of execution and reproducibility.
+`Run` — это контракт: при совпадении входов и разрешении политики результат должен быть воспроизводим в пределах модели детерминизма (раздел 06), что снижает риск непроверяемых выводов.
 
-Run is uniquely defined by the following inputs:
+## 02.3 Явный контекст ML‑эксперимента
+Система требует явного представления всех факторов, влияющих на результат, что снижает риск скрытого состояния.
 
-- Project;
-- DatasetVersion (one or more);
-- CodeRef with `commit_sha`;
-- EnvironmentLock;
-- execution parameters;
-- execution policy (for example, network egress restrictions).
+Минимальный явный контекст:
+1. `DatasetVersion`, схема, статистики и lineage данных;
+2. `CodeRef` с `commit_sha` и ссылкой на репозиторий;
+3. `EnvironmentDefinition` и `EnvironmentLock`;
+4. `Run` и `PipelineRun` со спецификацией и историей статусов;
+5. артефакты и метрики как отдельные сущности;
+6. политики доступа и аудит.
 
-Run produces:
+Действия, не привязанные к явному контексту, считаются дефектом процесса и должны быть устранены или формализованы.
 
-- Artifact (logs, metrics, files, reports, model weights);
-- execution trace;
-- AuditEvent for all significant operations and status changes.
-
-Run is a contract: when inputs match and policy permits execution, the result must be reproducible within the determinism model (Section 06).
-
-## 02.3 Explicit ML experiment context
-
-Animus introduces a mandatory requirement:
-
-All elements that affect a result must be represented in the system as explicit entities or references to entities.
-
-Minimum explicit context:
-
-1. DatasetVersion, schema, statistics, and lineage of data;
-2. CodeRef with `commit_sha` and repository reference;
-3. EnvironmentDefinition and EnvironmentLock;
-4. Run and PipelineRun with specification and status history;
-5. Artifact and metrics as first-class objects;
-6. policies, access, and audit.
-
-Any action that cannot be bound to explicit context is treated as a process defect and must be eliminated or made explicit.
-
-## 02.4 Reproducibility as a platform property
-
-Reproducibility is treated as a platform property derived from the domain model and execution constraints, not as a team discipline. Formal definitions and requirements are specified in Section 06.
+## 02.4 Воспроизводимость как системное свойство
+Воспроизводимость является свойством системы, вытекающим из доменной модели и ограничений исполнения, что снижает риск зависимости от «ручной дисциплины» команд.

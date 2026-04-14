@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -352,7 +352,7 @@ func downloadDatasetVersion(t *testing.T, client *http.Client, baseURL, projectI
 
 func createEnvironmentDefinition(t *testing.T, client *http.Client, baseURL, projectID, imageName, imageRef string) string {
 	payload := map[string]any{
-		"name": "e2e-env-" + imageName,
+		"name":       "e2e-env-" + imageName,
 		"baseImages": []map[string]any{{"name": imageName, "ref": imageRef}},
 	}
 	url := fmt.Sprintf("%s/projects/%s/environment-definitions", baseURL, projectID)

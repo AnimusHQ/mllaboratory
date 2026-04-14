@@ -1,41 +1,34 @@
-# Contributing
+# Вклад в репозиторий
 
-Thanks for contributing to Animus DataPilot's open integration layer. This repository targets production-grade enterprise pilots; changes must be verifiable and audit-ready.
+Документ фиксирует правила внесения изменений, что снижает риск несогласованных и непроверяемых правок.
 
-## Development setup
-
-Prerequisites:
-
+## Среда разработки
+**Предусловия:**
 - Go 1.25+
 - Python 3.10+
 
-Bootstrap:
-
+**Bootstrap:**
 ```bash
 make bootstrap
 ```
 
-## Coding standards
+## Стандарты кода
+- Go: `gofmt` и `go vet` должны проходить (`make lint`).
+- Python: `python -m compileall` должен проходить (`make lint`).
+- Исключить TODO и заглушки, что снижает риск «частичных» изменений.
+- Предпочитать небольшие проверяемые изменения, что снижает риск регрессий.
 
-- Go: `gofmt` must pass and `go vet` must be clean (`make lint`).
-- Python: `python -m compileall` must pass (`make lint`).
-- Avoid TODOs and stub implementations.
-- Prefer small, testable changes with clear commit messages.
-
-## Tests
-
+## Тесты
 ```bash
 make test
 ```
 
-## Pull request checklist
+## Checklist PR
+- [ ] `make lint` проходит
+- [ ] `make test` проходит
+- [ ] OpenAPI обновлён при изменении эндпоинтов
+- [ ] Документация SDK обновлена при изменении использования
+- [ ] Влияние на безопасность оценено
 
-- [ ] `make lint` passes
-- [ ] `make test` passes
-- [ ] OpenAPI specs updated if endpoints change
-- [ ] SDK docs updated if usage changes
-- [ ] Security implications reviewed
-
-## Commit style
-
-There is no enforced commit format. Use a short, descriptive subject and include scope where helpful (e.g., `experiments: add evidence bundle verification`).
+## Стиль коммитов
+Формат не навязывается; используйте короткий предмет и область (`experiments: add evidence bundle verification`).

@@ -52,7 +52,7 @@ export function DatasetsTable({ datasets }: { datasets: Dataset[] }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <input
-          className="h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+          className="h-9 w-64 rounded-xl border border-white/15 bg-[#0b1626]/80 px-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           placeholder="Поиск по имени или идентификатору"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -94,12 +94,15 @@ export function DatasetsTable({ datasets }: { datasets: Dataset[] }) {
               <tr key={dataset.dataset_id}>
                 <td className="font-mono text-xs">{dataset.dataset_id}</td>
                 <td>
-                  <Link href={`/console/datasets?dataset_id=${dataset.dataset_id}`} className="text-sm font-semibold text-primary">
+                  <Link
+                    href={`/console/datasets?dataset_id=${dataset.dataset_id}`}
+                    className="text-sm font-semibold text-accent hover:text-white"
+                  >
                     {dataset.name}
                   </Link>
                 </td>
-                <td className="text-muted-foreground">{dataset.description ?? '—'}</td>
-                <td className="text-xs text-muted-foreground">{formatDateTime(dataset.created_at)}</td>
+                <td className="text-white/60">{dataset.description ?? '—'}</td>
+                <td className="text-xs text-white/60">{formatDateTime(dataset.created_at)}</td>
                 <td>
                   <CopyButton value={dataset.dataset_id} />
                 </td>

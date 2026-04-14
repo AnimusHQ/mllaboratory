@@ -10,13 +10,13 @@ import (
 )
 
 type stubSessionStore struct {
-	record              repo.SessionRecord
-	active              []repo.SessionRecord
-	includeCreated      bool
-	revoked             bool
-	revokedBy           string
-	revokeReason        string
-	revokedIDs          []string
+	record               repo.SessionRecord
+	active               []repo.SessionRecord
+	includeCreated       bool
+	revoked              bool
+	revokedBy            string
+	revokeReason         string
+	revokedIDs           []string
 	revokeBySubjectCount int
 }
 

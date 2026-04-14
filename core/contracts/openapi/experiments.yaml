@@ -233,23 +233,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
   /experiments/runs:execute:
     post:
-      summary: Execute a training run
+      summary: Create a training run execution intent
       description: |
-        Creates an immutable experiment run record in `pending` state, registers an execution intent, and submits the configured
-        training executor (Kubernetes Job or Docker).
-
-        Image reference requirements depend on the executor:
-        - Kubernetes: `image_ref` must be digest-pinned (e.g. `repo/image@sha256:...`)
-        - Docker: `image_ref` may be digest-pinned or a local tag; tags are resolved to an immutable image ID digest and recorded in `image_digest`
-
-        The training container receives environment variables:
-        - `RUN_ID`
-        - `DATASET_VERSION_ID`
-        - `DATAPILOT_URL`
-        - `TOKEN` (run-scoped, short-lived)
-
-        Policy evaluation runs before execution. If a policy requires approval, the run is recorded in `pending` state and
-        the response returns `202` with approval IDs.
+        Legacy compatibility endpoint.
+        Creates an immutable experiment run record in `pending` state and records execution intent.
+        Control Plane does not execute user workloads directly; execution is Data Plane-only.
+        Use `/projects/{project_id}/runs/{run_id}:dispatch` for canonical Data Plane execution dispatch.
       requestBody:
         required: true
         content:
@@ -300,7 +289,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "501":
-          description: Training executor disabled
+          description: Control-plane execution disabled
           content:
             application/json:
               schema:

@@ -124,12 +124,12 @@ export function ModelVersionsTable({
                     {version.modelVersionId}
                     <CopyButton value={version.modelVersionId} />
                   </div>
-                  <div className="text-xs text-muted-foreground">v{version.version}</div>
+                  <div className="text-xs text-white/60">v{version.version}</div>
                 </td>
                 <td>
                   <StatusPill status={version.status} />
                 </td>
-                <td className="text-xs text-muted-foreground">
+                <td className="text-xs text-white/60">
                   <div className="flex items-center gap-2">
                     Run: {version.runId}
                     <CopyButton value={version.runId} />
@@ -137,12 +137,12 @@ export function ModelVersionsTable({
                   <div>Артефакты: {version.artifactIds?.length ?? 0}</div>
                   <Link
                     href={`/console/lineage?model_version_id=${version.modelVersionId}`}
-                    className="text-xs font-semibold text-primary"
+                    className="text-xs font-semibold text-accent hover:text-white"
                   >
                     Lineage
                   </Link>
                 </td>
-                <td className="text-xs text-muted-foreground">{formatDateTime(version.createdAt)}</td>
+                <td className="text-xs text-white/60">{formatDateTime(version.createdAt)}</td>
                 <td>
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap gap-2">

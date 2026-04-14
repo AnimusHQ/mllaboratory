@@ -5,7 +5,7 @@ export function PolicyHint({ allowed, capability }: { allowed: boolean; capabili
     return null;
   }
   return (
-    <div className="text-xs text-muted-foreground">
+    <div className="text-xs text-white/50">
       Ограничение доступа: требуется {capabilityLabel(capability)}. Код: RBAC_DENIED.
     </div>
   );

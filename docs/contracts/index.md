@@ -108,6 +108,7 @@
 - Базовые цели: `make test`, `make integrations-test`, `make system-up`, `make system-test`, `make e2e-full`, `make artifacts-collect`.
 
 ### 1.14 Эксплуатационные документы
+- Стартовый маршрут: `docs/ops/start-here.md`.
 - Развёртывание и архитектура: `docs/ops/deploy-overview.md`.
 - Установка Helm: `docs/ops/helm-install.md`.
 - Конфигурация: `docs/ops/configuration-reference.md`.

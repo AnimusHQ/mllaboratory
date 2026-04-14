@@ -6,16 +6,21 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 source "${ROOT_DIR}/scripts/lib/paths.sh"
 
 fail=0
+enterprise_mode="${ANIMUS_COMPAT_ENTERPRISE_MODE:-allow_stub}"
+if [[ "${enterprise_mode}" != "allow_stub" && "${enterprise_mode}" != "require_initialized" ]]; then
+  echo "compat-check: unsupported ANIMUS_COMPAT_ENTERPRISE_MODE=${enterprise_mode} (expected allow_stub|require_initialized)" >&2
+  exit 1
+fi
 
 contracts_dir="$(animus_contracts_dir)"
 deploy_dir="$(animus_deploy_dir)"
-enterprise_scripts_dir="$(animus_enterprise_scripts_dir)"
 canonical_contracts="${ROOT_DIR}/core/contracts"
 legacy_contracts_stub="${ROOT_DIR}/open/api"
 canonical_deploy="${ROOT_DIR}/deploy"
 legacy_deploy_stub="${ROOT_DIR}/closed/deploy"
 canonical_enterprise_scripts="${ROOT_DIR}/enterprise/scripts"
 legacy_enterprise_scripts="${ROOT_DIR}/closed/scripts"
+legacy_sdk_stub="${ROOT_DIR}/open/sdk"
 required_enterprise_scripts=(
   "airgap-bundle.sh"
   "backup.sh"
@@ -23,18 +28,15 @@ required_enterprise_scripts=(
   "verify-restore.sh"
   "dr-validate.sh"
 )
-allowed_legacy_wrapper_scripts=(
-  "airgap-bundle.sh"
-  "backup.sh"
-  "restore.sh"
-  "verify-restore.sh"
-  "dr-validate.sh"
-  "dev.sh"
-)
 
-check_stub_only_readme() {
+check_stub_only_stub_dir() {
   local dir="$1"
   local label="$2"
+  local marker=".stub-marker"
+  local has_readme=0
+  local entry
+  local -a entries=()
+  local -a unexpected=()
 
   if [[ ! -d "${dir}" ]]; then
     echo "compat-check: ${label} stub dir missing: ${dir}" >&2
@@ -42,9 +44,28 @@ check_stub_only_readme() {
     return
   fi
 
-  mapfile -t entries < <(find "${dir}" -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)
-  if [[ "${#entries[@]}" -ne 1 || "${entries[0]}" != "README.md" ]]; then
-    echo "compat-check: ${label} stub must contain only README.md: ${dir}" >&2
+  # Legacy stub directories may contain README.md and an optional marker file.
+  mapfile -t entries < <(find "${dir}" -mindepth 1 -printf '%P\n' | sort)
+  for entry in "${entries[@]}"; do
+    if [[ "${entry}" == "README.md" ]]; then
+      has_readme=1
+      continue
+    fi
+    if [[ "${entry}" == "${marker}" ]]; then
+      continue
+    fi
+    unexpected+=("${entry}")
+  done
+
+  if [[ "${has_readme}" -ne 1 ]]; then
+    echo "compat-check: ${label} stub must include README.md: ${dir}" >&2
+    fail=1
+  fi
+
+  if [[ "${#unexpected[@]}" -gt 0 ]]; then
+    echo "compat-check: ${label} stub must contain only README.md (and optional ${marker}): ${dir}" >&2
+    echo "compat-check: unexpected entries under ${dir}:" >&2
+    printf '  - %s\n' "${unexpected[@]}" >&2
     fail=1
   fi
 }
@@ -63,20 +84,34 @@ check_non_empty_dir() {
   fi
 }
 
+is_valid_enterprise_scripts_dir() {
+  local dir="$1"
+  local script
+  for script in "${required_enterprise_scripts[@]}"; do
+    [[ -f "${dir}/${script}" ]] || return 1
+    [[ -x "${dir}/${script}" ]] || return 1
+  done
+  return 0
+}
+
 check_legacy_references() {
   local hits
   # Enforce canonical paths across active build/release surfaces while keeping
   # explicit migration shims and historical docs excluded.
-  hits="$(rg -n --hidden '(open/api|closed/deploy|closed/scripts)' "${ROOT_DIR}" \
+  hits="$(rg -n --hidden '(open/api|closed/deploy|closed/scripts|open/sdk)' "${ROOT_DIR}" \
     --glob '!.git/*' \
     --glob '!docs/**' \
     --glob '!open/api/README.md' \
+    --glob '!open/sdk/README.md' \
     --glob '!closed/deploy/README.md' \
-    --glob '!closed/scripts/*.sh' \
+    --glob '!closed/scripts/README.md' \
+    --glob '!closed/scripts/.stub-marker' \
     --glob '!scripts/compat_check.sh' \
     --glob '!scripts/legacy_scan.sh' \
+    --glob '!scripts/submodule_check.sh' \
     --glob '!scripts/lib/paths.sh' \
     --glob '!.gitignore' \
+    --glob '!README.md' \
     --glob '!open/demo/quickstart.sh' \
     --glob '!closed/frontend_console/lib/gateway-openapi.ts' \
     --glob '!closed/frontend_console/dist-test/**' || true)"
@@ -130,91 +165,40 @@ if [[ -d "${canonical_deploy}/helm" && -d "${canonical_deploy}/docker" ]]; then
   fi
 fi
 
-for script in "${required_enterprise_scripts[@]}"; do
-  if [[ ! -f "${enterprise_scripts_dir}/${script}" ]]; then
-    echo "compat-check: enterprise script missing: ${enterprise_scripts_dir}/${script}" >&2
-    fail=1
-  fi
-  if [[ ! -x "${enterprise_scripts_dir}/${script}" ]]; then
-    echo "compat-check: enterprise script must be executable: ${enterprise_scripts_dir}/${script}" >&2
-    fail=1
-  fi
-  if [[ ! -f "${canonical_enterprise_scripts}/${script}" ]]; then
-    echo "compat-check: canonical enterprise script missing: ${canonical_enterprise_scripts}/${script}" >&2
-    fail=1
-  fi
-  if [[ ! -x "${canonical_enterprise_scripts}/${script}" ]]; then
-    echo "compat-check: canonical enterprise script must be executable: ${canonical_enterprise_scripts}/${script}" >&2
-    fail=1
-  fi
-done
-if [[ "${enterprise_scripts_dir}" != "${canonical_enterprise_scripts}" ]]; then
-  echo "compat-check: resolver must prefer canonical enterprise scripts dir (${canonical_enterprise_scripts}), got ${enterprise_scripts_dir}" >&2
-  fail=1
+canonical_enterprise_ready=0
+if is_valid_enterprise_scripts_dir "${canonical_enterprise_scripts}"; then
+  canonical_enterprise_ready=1
 fi
 
-check_stub_only_readme "${legacy_contracts_stub}" "legacy contracts"
-check_stub_only_readme "${legacy_deploy_stub}" "legacy deploy"
-
-if [[ ! -d "${legacy_enterprise_scripts}" ]]; then
-  echo "compat-check: legacy enterprise scripts dir missing: ${legacy_enterprise_scripts}" >&2
-  fail=1
-fi
-for wrapper in "${legacy_enterprise_scripts}"/*.sh; do
-  wrapper_name="$(basename "${wrapper}")"
-  wrapper_allowed=0
-  for allowed in "${allowed_legacy_wrapper_scripts[@]}"; do
-    if [[ "${wrapper_name}" == "${allowed}" ]]; then
-      wrapper_allowed=1
-      break
+if [[ "${canonical_enterprise_ready}" -eq 1 ]]; then
+  enterprise_scripts_dir="$(animus_enterprise_scripts_dir)"
+  for script in "${required_enterprise_scripts[@]}"; do
+    if [[ ! -f "${enterprise_scripts_dir}/${script}" ]]; then
+      echo "compat-check: enterprise script missing: ${enterprise_scripts_dir}/${script}" >&2
+      fail=1
+    fi
+    if [[ ! -x "${enterprise_scripts_dir}/${script}" ]]; then
+      echo "compat-check: enterprise script must be executable: ${enterprise_scripts_dir}/${script}" >&2
+      fail=1
     fi
   done
-  if [[ "${wrapper_allowed}" -ne 1 ]]; then
-    echo "compat-check: unexpected legacy script (only wrappers allowed): ${wrapper}" >&2
-    fail=1
-    continue
-  fi
-  if ! rg -n 'exec ' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: legacy script must be wrapper-style (exec handoff): ${wrapper}" >&2
+  if [[ "${enterprise_scripts_dir}" != "${canonical_enterprise_scripts}" ]]; then
+    echo "compat-check: resolver must prefer canonical enterprise scripts dir (${canonical_enterprise_scripts}), got ${enterprise_scripts_dir}" >&2
     fail=1
   fi
-done
-for script in "${required_enterprise_scripts[@]}"; do
-  wrapper="${legacy_enterprise_scripts}/${script}"
-  if [[ ! -f "${wrapper}" ]]; then
-    echo "compat-check: legacy wrapper missing: ${wrapper}" >&2
-    fail=1
-    continue
-  fi
-  if ! rg -n "DEPRECATED: use \\./enterprise/scripts/${script} \\(will be removed after 2 releases\\)" "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper missing deprecation warning: ${wrapper}" >&2
+else
+  if [[ "${enterprise_mode}" == "allow_stub" ]]; then
+    echo "compat-check: enterprise/scripts not initialized; allow_stub mode enabled"
+  else
+    echo "compat-check: enterprise/scripts must be initialized in mode=${enterprise_mode}" >&2
     fail=1
   fi
-  if ! rg -n 'set -euo pipefail' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper must enforce strict shell mode: ${wrapper}" >&2
-    fail=1
-  fi
-  if ! rg -n 'BASH_SOURCE\[0\]' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper must resolve script directory via BASH_SOURCE: ${wrapper}" >&2
-    fail=1
-  fi
-  if ! rg -n '/\.\./\.\.' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper must use absolute repo-root resolution: ${wrapper}" >&2
-    fail=1
-  fi
-  if ! rg -n 'scripts/lib/paths.sh' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper must source resolver library: ${wrapper}" >&2
-    fail=1
-  fi
-  if ! rg -n "enterprise/scripts/${script}" "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper must reference canonical enterprise path: ${wrapper}" >&2
-    fail=1
-  fi
-  if ! rg -n 'exec "\$\{TARGET\}" "\$@"' "${wrapper}" >/dev/null 2>&1; then
-    echo "compat-check: wrapper missing exec handoff: ${wrapper}" >&2
-    fail=1
-  fi
-done
+fi
+
+check_stub_only_stub_dir "${legacy_contracts_stub}" "legacy contracts"
+check_stub_only_stub_dir "${legacy_deploy_stub}" "legacy deploy"
+check_stub_only_stub_dir "${legacy_enterprise_scripts}" "legacy enterprise scripts"
+check_stub_only_stub_dir "${legacy_sdk_stub}" "legacy sdk"
 
 saved_contracts_override="${ANIMUS_CONTRACTS_DIR-}"
 saved_contracts_set=0
@@ -255,11 +239,13 @@ saved_enterprise_set=0
 if [[ "${ANIMUS_ENTERPRISE_SCRIPTS_DIR+x}" == "x" ]]; then
   saved_enterprise_set=1
 fi
-ANIMUS_ENTERPRISE_SCRIPTS_DIR="enterprise/scripts"
-enterprise_override_resolved="$(animus_enterprise_scripts_dir)"
-if [[ "${enterprise_override_resolved}" != "${canonical_enterprise_scripts}" ]]; then
-  echo "compat-check: ANIMUS_ENTERPRISE_SCRIPTS_DIR override failed, got ${enterprise_override_resolved}" >&2
-  fail=1
+if [[ "${canonical_enterprise_ready}" -eq 1 ]]; then
+  ANIMUS_ENTERPRISE_SCRIPTS_DIR="enterprise/scripts"
+  enterprise_override_resolved="$(animus_enterprise_scripts_dir)"
+  if [[ "${enterprise_override_resolved}" != "${canonical_enterprise_scripts}" ]]; then
+    echo "compat-check: ANIMUS_ENTERPRISE_SCRIPTS_DIR override failed, got ${enterprise_override_resolved}" >&2
+    fail=1
+  fi
 fi
 if ANIMUS_ENTERPRISE_SCRIPTS_DIR="enterprise/missing" animus_enterprise_scripts_dir >/dev/null 2>&1; then
   echo "compat-check: invalid ANIMUS_ENTERPRISE_SCRIPTS_DIR must fail" >&2

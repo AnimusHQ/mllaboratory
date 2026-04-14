@@ -233,23 +233,12 @@ paths:
                 $ref: "#/components/schemas/ErrorResponse"
   /experiments/runs:execute:
     post:
-      summary: Execute a training run
+      summary: Create a training run execution intent
       description: |
-        Creates an immutable experiment run record in `pending` state, registers an execution intent, and submits the configured
-        training executor (Kubernetes Job or Docker).
-
-        Image reference requirements depend on the executor:
-        - Kubernetes: `image_ref` must be digest-pinned (e.g. `repo/image@sha256:...`)
-        - Docker: `image_ref` may be digest-pinned or a local tag; tags are resolved to an immutable image ID digest and recorded in `image_digest`
-
-        The training container receives environment variables:
-        - `RUN_ID`
-        - `DATASET_VERSION_ID`
-        - `DATAPILOT_URL`
-        - `TOKEN` (run-scoped, short-lived)
-
-        Policy evaluation runs before execution. If a policy requires approval, the run is recorded in `pending` state and
-        the response returns `202` with approval IDs.
+        Legacy compatibility endpoint.
+        Creates an immutable experiment run record in `pending` state and records execution intent.
+        Control Plane does not execute user workloads directly; execution is Data Plane-only.
+        Use `/projects/{project_id}/runs/{run_id}:dispatch` for canonical Data Plane execution dispatch.
       requestBody:
         required: true
         content:
@@ -300,7 +289,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "501":
-          description: Training executor disabled
+          description: Control-plane execution disabled
           content:
             application/json:
               schema:
@@ -3726,6 +3715,7 @@ paths:
           type: string
     post:
       summary: Экспорт версии модели
+      description: Экспорт доступен только для утверждённой версии и при выполнении policy‑решений (deny‑by‑default).
       parameters:
         - name: Idempotency-Key
           in: header
@@ -3990,6 +3980,291 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список DevEnvironment (short path)
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/DevEnvironmentState"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать DevEnvironment (short path)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить DevEnvironment (short path)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironment"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:open-ide-session:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Открыть IDE-сессию DevEnvironment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentAccessRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentAccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:stop:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Остановить DevEnvironment (short path)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /devenv-sessions/{session_id}/proxy/{path}:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Прокси-доступ к IDE DevEnvironment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
         "400":
           description: Invalid request
           content:
@@ -6058,10 +6333,13 @@ components:
     DevEnvironmentState:
       type: string
       enum: [provisioning, active, failed, expired, deleted]
+    DevEnvironmentRefType:
+      type: string
+      enum: [branch, tag, commit]
     DevEnvironment:
       type: object
       additionalProperties: false
-      required: [devEnvId, projectId, templateRef, templateVersion, imageName, imageRef, ttlSeconds, state, createdAt, expiresAt]
+      required: [devEnvId, projectId, templateRef, templateVersion, repoUrl, refType, refValue, imageName, imageRef, ttlSeconds, state, createdAt, expiresAt]
       properties:
         devEnvId:
           type: string
@@ -6074,6 +6352,14 @@ components:
         templateVersion:
           type: integer
         templateIntegritySha256:
+          type: string
+        repoUrl:
+          type: string
+        refType:
+          $ref: "#/components/schemas/DevEnvironmentRefType"
+        refValue:
+          type: string
+        commitPin:
           type: string
         imageName:
           type: string
@@ -6105,11 +6391,19 @@ components:
     DevEnvironmentCreateRequest:
       type: object
       additionalProperties: false
-      required: [templateRef]
+      required: [templateRef, repoUrl, refType, refValue]
       properties:
         idempotencyKey:
           type: string
         templateRef:
+          type: string
+        repoUrl:
+          type: string
+        refType:
+          $ref: "#/components/schemas/DevEnvironmentRefType"
+        refValue:
+          type: string
+        commitPin:
           type: string
         imageName:
           type: string

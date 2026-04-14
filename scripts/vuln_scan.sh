@@ -10,12 +10,18 @@ BIN_DIR="${ROOT_DIR}/.bin"
 OUTPUT_DIR="${SUPPLY_CHAIN_OUT:-${ROOT_DIR}/.cache/supply-chain}"
 VULN_DIR="${OUTPUT_DIR}/vuln"
 FAIL_ON="${VULN_FAIL_ON:-}" # e.g., critical, high, medium
+INSTALL_TOOLS="${ANIMUS_INSTALL_TOOLS:-0}"
 
 mkdir -p "${BIN_DIR}" "${VULN_DIR}"
 
 if ! command -v grype >/dev/null 2>&1; then
-  GOBIN="${BIN_DIR}" go install "github.com/anchore/grype/cmd/grype@${GRYPE_VERSION}"
-  export PATH="${BIN_DIR}:${PATH}"
+  if [[ "${INSTALL_TOOLS}" == "1" ]]; then
+    GOBIN="${BIN_DIR}" go install "github.com/anchore/grype/cmd/grype@${GRYPE_VERSION}"
+    export PATH="${BIN_DIR}:${PATH}"
+  else
+    echo "vuln-scan: grype not found; set ANIMUS_INSTALL_TOOLS=1 or install grype manually" >&2
+    exit 1
+  fi
 fi
 
 mapfile -t IMAGES < <("${ROOT_DIR}/scripts/list_images.sh" "$@")

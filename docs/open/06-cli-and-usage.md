@@ -1,156 +1,48 @@
-# CLI and Usage
+# CLI и практическая работа
 
-This document provides end-to-end usage flows using `curl`, plus SDK guidance for training containers.
+Документ даёт минимальный, проверяемый маршрут работы через `curl` и описывает поведение SDK в контейнере исполнения, что снижает риск ошибок интеграции.
 
-## Setup
+## Предусловия
+- Доступен Gateway.
+- Есть активная сессия или токен аутентификации.
+- Создание сущностей выполняется с `Idempotency-Key`, что снижает риск дублей при сбоях.
 
-These flows require access to a running Animus gateway (closed-core deployment). Set `GATEWAY_URL` to the gateway base URL before running the commands below.
-
-## Authentication header
-
-- Dev mode (`AUTH_MODE=dev`): no auth header is required.
-- OIDC mode: include an `Authorization` header.
-
-Example (OIDC token):
-
-```bash
-AUTH_HEADER='-H Authorization: Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9'
-```
-
-## Flow: dataset -> quality -> run -> evidence
+## Минимальный маршрут (Dataset → Run → Evidence)
 
 ```bash
 export GATEWAY_URL=http://localhost:8080
-AUTH_HEADER=${AUTH_HEADER:-}
+export AUTH_HEADER='-H Authorization: Bearer <token>'
 ```
 
-### 1) Register a dataset
-
+### 1) Создать Dataset
 ```bash
-dataset_id=$(curl -sS -X POST "${GATEWAY_URL}/api/dataset-registry/datasets" \
+curl -sS -X POST "${GATEWAY_URL}/api/dataset-registry/datasets" \
   ${AUTH_HEADER} \
   -H 'Content-Type: application/json' \
-  -d '{"name":"fraud-dataset","description":"Fraud training set","metadata":{"owner":"ml-team"}}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["dataset_id"])')
-
-echo "dataset_id=${dataset_id}"
+  -H 'Idempotency-Key: ds_create_0001' \
+  -d '{"name":"fraud-dataset","description":"Fraud training set","metadata":{"owner":"ml-team"}}'
 ```
 
-### 2) Upload an immutable dataset version
-
+### 2) Создать DatasetVersion и загрузить данные
 ```bash
-version_id=$(curl -sS -X POST "${GATEWAY_URL}/api/dataset-registry/datasets/${dataset_id}/versions/upload" \
+curl -sS -X POST "${GATEWAY_URL}/api/dataset-registry/datasets/<dataset_id>/versions/upload" \
   ${AUTH_HEADER} \
+  -H 'Idempotency-Key: dv_upload_0001' \
   -F 'file=@open/demo/data/demo.csv' \
-  -F 'metadata={"source":"demo"}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["version_id"])')
-
-echo "version_id=${version_id}"
+  -F 'metadata={"source":"demo"}'
 ```
 
-### 3) Define and evaluate a quality rule
+### 3) Создать Run / PipelineRun
+Создание Run требует явного контекста (`DatasetVersion`, `CodeRef`, `EnvironmentLock`, `PolicySnapshot`), что обеспечивает воспроизводимость и исключает скрытые зависимости. Конкретные поля и эндпоинты фиксируются в OpenAPI.
 
-```bash
-rule_id=$(curl -sS -X POST "${GATEWAY_URL}/api/quality/rules" \
-  ${AUTH_HEADER} \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"basic-csv","spec":{"checks":[{"id":"cols","type":"csv_header_has_columns","columns":["id","label"],"delimiter":","}]}}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["rule_id"])')
+### 4) Получить Evidence
+Evidence‑артефакт извлекается через Gateway и подтверждает provenance, аудит и параметры исполнения, что снижает риск утраты доказательности.
 
-echo "rule_id=${rule_id}"
-```
-
-```bash
-curl -sS -X POST "${GATEWAY_URL}/api/quality/evaluations" \
-  ${AUTH_HEADER} \
-  -H 'Content-Type: application/json' \
-  -d '{"dataset_version_id":"'"${version_id}"'","rule_id":"'"${rule_id}"'"}'
-```
-
-### 4) Create an experiment
-
-```bash
-experiment_id=$(curl -sS -X POST "${GATEWAY_URL}/api/experiments/experiments" \
-  ${AUTH_HEADER} \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"baseline","description":"Baseline run","metadata":{"team":"ml"}}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["experiment_id"])')
-
-echo "experiment_id=${experiment_id}"
-```
-
-### 5) Execute a training run (bind code + image)
-
-The execute call binds the run to a dataset version, git commit, and image digest.
-
-```bash
-run_payload=$(python3 - <<'PY'
-import json
-payload = {
-  "experiment_id": "EXP_ID",
-  "dataset_version_id": "VERSION_ID",
-  "image_ref": "ghcr.io/example/train@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-  "git_repo": "git@example.local/ml/fraud",
-  "git_commit": "0123456789abcdef0123456789abcdef01234567",
-  "git_ref": "refs/heads/main",
-  "params": {"lr": 0.001}
-}
-print(json.dumps(payload))
-PY
-)
-run_payload=${run_payload//EXP_ID/${experiment_id}}
-run_payload=${run_payload//VERSION_ID/${version_id}}
-
-run_id=$(curl -sS -X POST "${GATEWAY_URL}/api/experiments/experiments/runs:execute" \
-  ${AUTH_HEADER} \
-  -H 'Content-Type: application/json' \
-  -d "${run_payload}" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["run_id"])')
-
-echo "run_id=${run_id}"
-```
-
-If policy approvals are required, the response status is `202` with approval IDs.
-
-### 6) Check run status and events
-
-```bash
-curl -sS "${GATEWAY_URL}/api/experiments/experiment-runs/${run_id}" ${AUTH_HEADER}
-
-curl -sS "${GATEWAY_URL}/api/experiments/experiment-runs/${run_id}/events?limit=20" ${AUTH_HEADER}
-```
-
-### 7) Generate an evidence bundle
-
-```bash
-bundle_id=$(curl -sS -X POST "${GATEWAY_URL}/api/experiments/experiment-runs/${run_id}/evidence-bundles" \
-  ${AUTH_HEADER} \
-  -H 'Content-Type: application/json' \
-  -d '{}' \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["bundle"]["bundle_id"])')
-
-echo "bundle_id=${bundle_id}"
-```
-
-```bash
-curl -sS -o evidence.zip \
-  "${GATEWAY_URL}/api/experiments/experiment-runs/${run_id}/evidence-bundles/${bundle_id}/download" \
-  ${AUTH_HEADER}
-```
-
-### 8) Export execution ledger
-
-```bash
-curl -sS "${GATEWAY_URL}/api/experiments/execution-ledger?run_id=${run_id}&limit=1" ${AUTH_HEADER}
-```
-
-## Training container usage (SDK)
-
-Inside training or evaluation containers, use the SDK with run-scoped environment variables:
+## Использование SDK в контейнере исполнения
+SDK использует run‑scoped переменные окружения, что ограничивает доступ рамками конкретного Run и снижает риск повторного использования токена.
 
 ```python
 import os
-
 from animus_sdk import RunTelemetryLogger, DatasetRegistryClient, ExperimentsClient
 
 logger = RunTelemetryLogger.from_env(timeout_seconds=2.0)
@@ -165,15 +57,11 @@ exp = ExperimentsClient.from_env()
 exp.upload_run_artifact(kind="model", file_path="/tmp/model.bin")
 ```
 
-## Deterministic demo run
+## Где смотреть точные контракты
+- `open/api/openapi/gateway.yaml`
+- `open/api/openapi/experiments.yaml`
 
-```bash
-go run ./open/cmd/demo -dataset open/demo/data/demo.csv
-```
-
-## Related docs
-
-- [05-api.md](05-api.md)
-- [07-evidence-format.md](07-evidence-format.md)
-- [03-deployment.md](03-deployment.md)
-- [08-troubleshooting.md](08-troubleshooting.md)
+## Связанные документы
+- `docs/open/05-api.md`
+- `docs/open/07-evidence-format.md`
+- `docs/ops/start-here.md`

@@ -27,7 +27,7 @@ export function RoleBindingsTable({ bindings }: { bindings: RoleBinding[] }) {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <input
-          className="h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+          className="h-9 w-64 rounded-xl border border-white/15 bg-[#0b1626]/80 px-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           placeholder="Поиск по субъекту или роли"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -51,9 +51,9 @@ export function RoleBindingsTable({ bindings }: { bindings: RoleBinding[] }) {
               <tr key={binding.binding_id}>
                 <td className="font-mono text-xs">{binding.binding_id}</td>
                 <td>{binding.subject_type}</td>
-                <td className="text-muted-foreground">{binding.subject}</td>
+                <td className="text-white/60">{binding.subject}</td>
                 <td>{binding.role}</td>
-                <td className="text-xs text-muted-foreground">{binding.created_at}</td>
+                <td className="text-xs text-white/60">{binding.created_at}</td>
                 <td>
                   <CopyButton value={binding.binding_id} />
                 </td>

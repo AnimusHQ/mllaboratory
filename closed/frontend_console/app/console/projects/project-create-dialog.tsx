@@ -97,11 +97,11 @@ export function ProjectCreateDialog({ open, onClose }: CreateDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 py-8">
-      <div className="console-surface w-full max-w-2xl rounded-xl shadow-glow-sm">
-        <div className="flex items-center justify-between border-b border-border/60 px-6 py-4">
+      <div className="console-surface w-full max-w-2xl">
+        <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
           <div>
             <div className="text-sm font-semibold">Создание проекта</div>
-            <div className="text-xs text-muted-foreground">Операция требует административных прав.</div>
+            <div className="text-xs text-white/60">Операция требует административных прав.</div>
           </div>
           <Button variant="ghost" size="sm" onClick={onClose}>
             Закрыть
@@ -109,18 +109,18 @@ export function ProjectCreateDialog({ open, onClose }: CreateDialogProps) {
         </div>
         <div className="grid gap-4 px-6 py-5">
           <div className="grid gap-2">
-            <label className="text-xs text-muted-foreground">Имя проекта</label>
+            <label className="text-xs text-white/60">Имя проекта</label>
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
               placeholder="research-core"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-white/60">
               Допустимо: 3–64 символа, латиница, цифры, “.”, “_”, “-”.
             </p>
           </div>
           <div className="grid gap-2">
-            <label className="text-xs text-muted-foreground">Описание</label>
+            <label className="text-xs text-white/60">Описание</label>
             <Input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
@@ -128,7 +128,7 @@ export function ProjectCreateDialog({ open, onClose }: CreateDialogProps) {
             />
           </div>
           <div className="grid gap-2">
-            <label className="text-xs text-muted-foreground">Metadata (JSON)</label>
+            <label className="text-xs text-white/60">Metadata (JSON)</label>
             <Textarea
               value={metadataText}
               onChange={(event) => setMetadataText(event.target.value)}
@@ -149,14 +149,14 @@ export function ProjectCreateDialog({ open, onClose }: CreateDialogProps) {
                 </CardContent>
               ) : null}
               {apiError?.requestId ? (
-                <CardContent className="pt-0 text-xs text-muted-foreground">
+                <CardContent className="pt-0 text-xs text-white/60">
                   Request ID: {apiError.requestId}
                 </CardContent>
               ) : null}
             </Card>
           ) : null}
         </div>
-        <div className="flex items-center justify-end gap-3 border-t border-border/60 px-6 py-4">
+        <div className="flex items-center justify-end gap-3 border-t border-white/10 px-6 py-4">
           <Button variant="ghost" size="sm" onClick={onClose}>
             Отмена
           </Button>

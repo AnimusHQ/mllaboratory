@@ -99,16 +99,6 @@ func (c WebhookConnector) resolveSigningSecret(ctx context.Context, classRef str
 	if classRef == "" {
 		return "", nil
 	}
-	if c.Secrets == nil {
-		return "", errSecretUnavailable
-	}
-	lease, err := c.Secrets.Fetch(ctx, secrets.Request{
-		Subject:  "audit_export",
-		ClassRef: classRef,
-	})
-	if err != nil {
-		return "", err
-	}
 	key = strings.TrimSpace(key)
 	if key == "" {
 		key = strings.TrimSpace(c.SigningKey)
@@ -116,9 +106,20 @@ func (c WebhookConnector) resolveSigningSecret(ctx context.Context, classRef str
 	if key == "" {
 		key = defaultAuditExportSigningKey
 	}
-	value := strings.TrimSpace(lease.Env[key])
-	if value == "" {
-		return "", errSecretKeyMissing
+	value, err := secrets.FetchIntegrationSecret(ctx, c.Secrets, secrets.IntegrationSecret{
+		Scope:    secrets.IntegrationScopeAuditExport,
+		ClassRef: classRef,
+		Key:      key,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, secrets.ErrIntegrationSecretUnavailable):
+			return "", errSecretUnavailable
+		case errors.Is(err, secrets.ErrIntegrationSecretKeyMissing):
+			return "", errSecretKeyMissing
+		default:
+			return "", err
+		}
 	}
 	return value, nil
 }

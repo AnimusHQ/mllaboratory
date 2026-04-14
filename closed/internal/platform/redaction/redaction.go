@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	keyPattern = regexp.MustCompile(`(?i)(secret|token|password|api[_-]?key|credential)`) 
+	keyPattern    = regexp.MustCompile(`(?i)(secret|token|password|api[_-]?key|credential)`)
 	valuePatterns = []*regexp.Regexp{
 		regexp.MustCompile(`AKIA[0-9A-Z]{16}`),
 		regexp.MustCompile(`(?i)bearer\s+[A-Za-z0-9\-_.=]+`),

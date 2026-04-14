@@ -17,7 +17,7 @@ const statusStyles: Record<string, string> = {
 export function StatusPill({ status, label }: { status?: string | null; label?: string }) {
   const normalized = status?.toLowerCase() ?? 'unknown';
   return (
-    <span className={cn('console-pill', statusStyles[normalized] ?? 'border-border/70 text-muted-foreground')}>
+    <span className={cn('console-pill', statusStyles[normalized] ?? 'border-white/15 text-white/70')}>
       {label ?? status ?? 'не задано'}
     </span>
   );

@@ -116,4 +116,3 @@ func ReadFile(t *testing.T, path string) []byte {
 func FormatSHA256(value string) string {
 	return fmt.Sprintf("%064s", value)
 }
-

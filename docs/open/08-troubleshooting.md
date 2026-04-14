@@ -1,62 +1,42 @@
-# Troubleshooting (Open Integration Scope)
+# Диагностика (интеграционный контур)
 
-This guide focuses on integration issues when using the SDKs and API against a running Animus gateway.
+## Gateway недоступен
+**Проявление:** `connection refused` или таймаут.
 
-## Gateway unreachable
-
-Symptoms:
-- `connection refused` or timeouts on API requests.
-
-Fix:
-- Verify `ANIMUS_GATEWAY_URL` or `GATEWAY_URL`.
-- Confirm network access from CI/training environments to the gateway.
+**Действие → эффект → риск:**
+- проверить `ANIMUS_GATEWAY_URL`, доступность сети и DNS → восстанавливает доступ к API → снижает риск ложных ошибок интеграции.
 
 ## 401 Unauthorized
+**Проявление:** API возвращает `401`.
 
-Symptoms:
-- API calls return `401`.
-
-Fix:
-- Ensure a valid bearer token is supplied in the `Authorization` header.
-- Confirm the token is issued by the deployment's identity provider.
+**Действие → эффект → риск:**
+- проверить токен/сессию и срок действия → возвращает легитимный доступ → снижает риск ошибочной обработки данных без контекста пользователя.
 
 ## 403 Forbidden
+**Проявление:** API возвращает `403`.
 
-Symptoms:
-- API calls return `403`.
+**Действие → эффект → риск:**
+- проверить роль пользователя и политику доступа → предотвращает обход RBAC → снижает риск несанкционированных операций.
 
-Fix:
-- Confirm the token has the required role or scopes for the endpoint.
-- Policy approval endpoints require elevated permissions.
+## project_id_required
+**Проявление:** API возвращает `project_id_required`.
 
-## CI webhook signature mismatch
+**Действие → эффект → риск:**
+- выбрать/создать активный проект → устанавливает контекст операций → снижает риск работы с неверной областью данных.
 
-Symptoms:
-- CI webhook endpoints return `signature_invalid`.
+## SCM/Registry блокировки
+**Проявление:** запуск отклонён с кодами проверки CodeRef или подписи образа.
 
-Fix:
-- Ensure `ANIMUS_CI_WEBHOOK_SECRET` matches the gateway configuration.
-- Verify the timestamp and request body used for signing.
+**Действие → эффект → риск:**
+- проверить allowlist репозитория и digest образа → подтверждает происхождение кода и окружения → снижает риск неавторизованного кода и зависимостей.
 
-## Run token expired or invalid
+## SIEM экспорт не доставляется
+**Проявление:** записи уходят в DLQ.
 
-Symptoms:
-- Training container calls return `401` or `unauthenticated`.
+**Действие → эффект → риск:**
+- проверить доступность sink и выполнить replay → восстанавливает доставку → снижает риск потери аудита в внешней системе.
 
-Fix:
-- Ensure the job starts soon after run execution.
-- Request a new run token if the job was delayed.
-
-## Quality gate blocks downloads
-
-Symptoms:
-- Dataset download returns `quality_rule_not_set`, `quality_not_evaluated`, or `quality_gate_failed`.
-
-Fix:
-- The closed-core services enforce quality gates; request a successful evaluation for the dataset version.
-
-## Related docs
-
-- [05-api.md](05-api.md)
-- [06-cli-and-usage.md](06-cli-and-usage.md)
-- [07-evidence-format.md](07-evidence-format.md)
+## Связанные документы
+- `docs/open/05-api.md`
+- `docs/ops/troubleshooting.md`
+- `docs/ops/siem-export.md`

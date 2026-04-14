@@ -17,13 +17,11 @@ import (
 	"github.com/animus-labs/animus-go/closed/internal/platform/auth"
 	"github.com/animus-labs/animus-go/closed/internal/platform/env"
 	"github.com/animus-labs/animus-go/closed/internal/platform/httpserver"
-	"github.com/animus-labs/animus-go/closed/internal/platform/k8s"
 	"github.com/animus-labs/animus-go/closed/internal/platform/objectstore"
 	"github.com/animus-labs/animus-go/closed/internal/platform/postgres"
 	"github.com/animus-labs/animus-go/closed/internal/platform/rbac"
 	"github.com/animus-labs/animus-go/closed/internal/platform/secrets"
 	repopg "github.com/animus-labs/animus-go/closed/internal/repo/postgres"
-	"github.com/animus-labs/animus-go/closed/internal/runtimeexec"
 )
 
 func main() {
@@ -43,6 +41,14 @@ func main() {
 	rbacAllowDirect, err := env.Bool("AUTH_RBAC_ALLOW_DIRECT_ROLES", true)
 	if err != nil {
 		logger.Error("invalid env", "error", err)
+		os.Exit(2)
+	}
+	profile := strings.ToLower(strings.TrimSpace(env.String("ANIMUS_PROFILE", "dev")))
+	if profile == "" {
+		profile = "dev"
+	}
+	if profile != "dev" && profile != "production" {
+		logger.Error("invalid profile", "profile", profile)
 		os.Exit(2)
 	}
 
@@ -154,51 +160,6 @@ func main() {
 		os.Exit(2)
 	}
 
-	syncInterval, err := env.Duration("ANIMUS_TRAINING_SYNC_INTERVAL", 5*time.Second)
-	if err != nil {
-		logger.Error("invalid training sync interval", "error", err)
-		os.Exit(2)
-	}
-
-	executorMode := strings.ToLower(strings.TrimSpace(env.String("ANIMUS_TRAINING_EXECUTOR", "disabled")))
-	trainingNamespace := strings.TrimSpace(env.String("ANIMUS_TRAINING_K8S_NAMESPACE", ""))
-	var trainingExec trainingExecutor
-	switch executorMode {
-	case "", "disabled":
-		trainingExec = nil
-	case "kubernetes", "k8s":
-		client, err := k8s.NewInClusterClient()
-		if err != nil {
-			logger.Error("k8s client init failed", "error", err)
-			os.Exit(2)
-		}
-		if trainingNamespace == "" {
-			trainingNamespace = client.Namespace()
-		}
-		jobTTLSeconds, err := env.Int("ANIMUS_TRAINING_K8S_JOB_TTL_SECONDS", 3600)
-		if err != nil {
-			logger.Error("invalid job ttl seconds", "error", err)
-			os.Exit(2)
-		}
-		jobServiceAccount := env.String("ANIMUS_TRAINING_K8S_JOB_SERVICE_ACCOUNT", "")
-		exec, err := runtimeexec.NewKubernetesJobExecutor(client, trainingNamespace, int32(jobTTLSeconds), jobServiceAccount)
-		if err != nil {
-			logger.Error("k8s executor init failed", "error", err)
-			os.Exit(2)
-		}
-		trainingExec = exec
-	case "docker":
-		exec, err := runtimeexec.NewDockerExecutor(env.String("ANIMUS_DOCKER_BIN", "docker"))
-		if err != nil {
-			logger.Error("docker executor init failed", "error", err)
-			os.Exit(2)
-		}
-		trainingExec = exec
-	default:
-		logger.Error("unsupported training executor", "mode", executorMode)
-		os.Exit(2)
-	}
-
 	roleBindings := repopg.NewRoleBindingStore(db)
 	auditAppender := repopg.NewAuditAppender(db, nil)
 	authorizer := rbac.Authorizer{
@@ -237,23 +198,6 @@ func main() {
 
 	datapilotURL := env.String("ANIMUS_DATAPILOT_URL", "http://localhost:8080")
 	dataplaneURL := env.String("ANIMUS_DATAPLANE_URL", "")
-
-	evaluationEnabled, err := env.Bool("ANIMUS_EVALUATION_ENABLED", true)
-	if err != nil {
-		logger.Error("invalid evaluation enabled flag", "error", err)
-		os.Exit(2)
-	}
-	evalPreviewSamples, err := env.Int("ANIMUS_EVAL_PREVIEW_SAMPLES", 16)
-	if err != nil {
-		logger.Error("invalid evaluation preview samples", "error", err)
-		os.Exit(2)
-	}
-	evalSyncInterval, err := env.Duration("ANIMUS_EVALUATION_SYNC_INTERVAL", syncInterval)
-	if err != nil {
-		logger.Error("invalid evaluation sync interval", "error", err)
-		os.Exit(2)
-	}
-	evalImageRef := env.String("ANIMUS_EVALUATION_IMAGE_REF", "")
 	dpReconcileInterval, err := env.Duration("ANIMUS_DP_RECONCILE_INTERVAL", 30*time.Second)
 	if err != nil {
 		logger.Error("invalid dp reconcile interval", "error", err)
@@ -290,8 +234,6 @@ func main() {
 		dataplaneURL,
 		evidenceSigningSecret,
 		gitlabWebhookSecret,
-		trainingExec,
-		trainingNamespace,
 		registryPolicyResolver,
 		registryCfg.VerifyTimeout,
 		registryProviders,
@@ -305,16 +247,6 @@ func main() {
 	)
 	api.register(mux)
 
-	startTrainingSyncer(ctx, logger, db, trainingExec, syncInterval)
-	startEvaluationSyncer(ctx, logger, db, trainingExec, evaluationSyncerConfig{
-		Enabled:               evaluationEnabled,
-		Interval:              evalSyncInterval,
-		DefaultImageRef:       evalImageRef,
-		DefaultPreviewSamples: evalPreviewSamples,
-		RunTokenSecret:        internalAuthSecret,
-		RunTokenTTL:           runTokenTTL,
-		DatapilotURL:          datapilotURL,
-	})
 	startDPReconciler(ctx, logger, db, dataplaneURL, internalAuthSecret, dpReconcileInterval, dpHeartbeatStaleAfter)
 	startDevEnvReconciler(ctx, logger, db, dataplaneURL, internalAuthSecret, devEnvReconcileInterval)
 	webhookWorker := webhooks.NewWorker(

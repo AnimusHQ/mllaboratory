@@ -16,13 +16,13 @@ if [[ -f "${ROOT_DIR}/.cache/system_env" ]]; then
   source "${ROOT_DIR}/.cache/system_env"
 fi
 
-if [[ -d "${ROOT_DIR}/closed/frontend_console/test-results" ]]; then
+if [[ -d "${ROOT_DIR}/closed/ui/test-results" ]]; then
   mkdir -p "${ARTIFACTS_DIR}/ui"
-  cp -R "${ROOT_DIR}/closed/frontend_console/test-results" "${ARTIFACTS_DIR}/ui/"
+  cp -R "${ROOT_DIR}/closed/ui/test-results" "${ARTIFACTS_DIR}/ui/"
 fi
-if [[ -d "${ROOT_DIR}/closed/frontend_console/coverage" ]]; then
+if [[ -d "${ROOT_DIR}/closed/ui/coverage" ]]; then
   mkdir -p "${ARTIFACTS_DIR}/ui"
-  cp -R "${ROOT_DIR}/closed/frontend_console/coverage" "${ARTIFACTS_DIR}/ui/"
+  cp -R "${ROOT_DIR}/closed/ui/coverage" "${ARTIFACTS_DIR}/ui/"
 fi
 
 GATEWAY_URL="${ANIMUS_E2E_GATEWAY_URL:-}"

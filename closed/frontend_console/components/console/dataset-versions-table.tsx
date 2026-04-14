@@ -35,19 +35,19 @@ export function DatasetVersionsTable({ versions, role }: { versions: DatasetVers
               </td>
               <td className="text-xs">{version.dataset_id}</td>
               <td className="font-mono text-xs">{version.content_sha256}</td>
-              <td className="text-xs text-muted-foreground">{version.size_bytes ?? '—'}</td>
-              <td className="text-xs text-muted-foreground">{formatDateTime(version.created_at)}</td>
+              <td className="text-xs text-white/60">{version.size_bytes ?? '—'}</td>
+              <td className="text-xs text-white/60">{formatDateTime(version.created_at)}</td>
               <td>
                 <div className="space-y-1">
                   {canRead ? (
                     <Link
                       href={`/api/dataset-registry/dataset-versions/${version.version_id}/download`}
-                      className="text-sm font-semibold text-primary"
+                      className="text-sm font-semibold text-accent hover:text-white"
                     >
                       Скачать
                     </Link>
                   ) : (
-                    <span className="text-xs text-muted-foreground">Скачивание недоступно</span>
+                    <span className="text-xs text-white/40">Скачивание недоступно</span>
                   )}
                   <PolicyHint allowed={canRead} capability="dataset:read" />
                 </div>

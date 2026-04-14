@@ -1,55 +1,32 @@
-# 11. Risk and Threat Model
+# 11. Риск‑ и threat‑модель
 
-## 11.1 Scope
+## 11.1 Назначение
+Раздел фиксирует активы, угрозы и минимальный набор мер, что снижает риск неполной комплаенс‑оценки.
 
-This section enumerates the assets, threat actors, and key risk categories for Animus Datalab. It defines the minimum threat model required for security and compliance review.
+## 11.2 Защищаемые активы
+- данные и `DatasetVersion` → снижение риска подмены входов;
+- модели и `ModelVersion` → снижение риска несанкционированного экспорта;
+- артефакты и результаты → снижение риска утраты доказательности;
+- метаданные и политики → снижение риска скрытых решений;
+- учётные данные и секреты → снижение риска компрометации;
+- аудит → снижение риска ретроспективной правки.
 
-## 11.2 Protected assets
+## 11.3 Источники угроз
+- ошибки легитимных пользователей;
+- компрометированные пользователи и сервисные аккаунты;
+- недоверенный код в Data Plane;
+- ошибки оператора и инфраструктурные сбои.
 
-Protected assets include:
+## 11.4 Категории угроз (STRIDE)
+- **Spoofing** → SSO и проверка сессий → снижает риск подмены идентичности.
+- **Tampering** → неизменяемые записи и хэши → снижает риск подмены данных.
+- **Repudiation** → append‑only audit → снижает риск отрицания действий.
+- **Information disclosure** → project‑scoped RBAC и секреты только в DP → снижает риск утечки.
+- **Denial of service** → лимиты и quotas → снижает риск деградации.
+- **Elevation of privilege** → минимум привилегий и approvals → снижает риск эскалации.
 
-- data and DatasetVersion;
-- Model and ModelVersion;
-- Artifact and execution outputs;
-- metadata and policies;
-- credentials and secrets;
-- audit history.
+## 11.5 Операционные риски и реакция
+Runbook‑процедуры покрывают отказ CP/DP, сбои аудита, компрометацию учётных записей и утечки, что снижает риск непрозрачной реакции на инциденты.
 
-## 11.3 Threat actors
-
-Threat actors include:
-
-- legitimate users making errors or misconfigurations;
-- malicious or compromised users;
-- compromised service accounts;
-- untrusted user code executed in Data Plane;
-- infrastructure compromise or operator error.
-
-## 11.4 Threat categories (STRIDE)
-
-Minimum threat categories and required mitigations:
-
-- Spoofing: mitigate via SSO, service account controls, and authentication verification.
-- Tampering: mitigate via immutable records, integrity checks, and audit.
-- Repudiation: mitigate via append-only AuditEvent and correlation identifiers.
-- Information disclosure: mitigate via Project-scoped RBAC, isolation, and secret handling.
-- Denial of service: mitigate via quotas, rate limits, and resource controls.
-- Elevation of privilege: mitigate via least privilege and explicit policy approvals.
-
-Security controls are defined in Section 08.
-
-## 11.5 Operational risks and response
-
-The following risks must have defined operational responses (see Section 09.10):
-
-- Control Plane unavailable.
-- Run stuck in queued or not starting.
-- Data Plane unavailable or degraded.
-- Audit export failure.
-- Account compromise.
-- Data or Model leakage incident.
-- Control Plane metadata loss.
-
-## 11.6 Residual risk and acceptance
-
-Residual risk is accepted only when mitigations are documented, auditability is preserved, and acceptance criteria are met (Section 12).
+## 11.6 Допустимый остаточный риск
+Остаточный риск допускается только при документированных мерах и выполнении критериев приёмки (раздел 12).

@@ -211,7 +211,7 @@ func mergeMaps(dst, src map[string]any) {
 func collectCPImages(values cpValues) []string {
 	images := make([]string, 0)
 	for name := range values.Services {
-		images = append(images, serviceImage(values.Image, name))
+		images = append(images, serviceImage(values.Image.Repository, values.Image.Tag, values.Image.Digest, values.Image.Digests, name))
 	}
 	if values.UI.Enabled {
 		images = append(images, uiImage(values))
@@ -227,36 +227,34 @@ func collectCPImages(values cpValues) []string {
 			images = append(images, strings.TrimSpace(values.Minio.MCImage))
 		}
 	}
-	images = append(images, testImage(values.Tests.Image))
+	images = append(images, testImage(values.Tests.Image.Repository, values.Tests.Image.Tag, values.Tests.Image.Digest))
 	return filterEmpty(images)
 }
 
 func collectDPImages(values dpValues) []string {
-	images := []string{dataplaneImage(values.Image), testImage(values.Tests.Image)}
+	images := []string{
+		dataplaneImage(values.Image.Repository, values.Image.Tag, values.Image.Digest),
+		testImage(values.Tests.Image.Repository, values.Tests.Image.Tag, values.Tests.Image.Digest),
+	}
 	return filterEmpty(images)
 }
 
-func serviceImage(image struct {
-	Repository string
-	Tag        string
-	Digest     string
-	Digests    map[string]string
-}, name string) string {
-	repo := strings.TrimSpace(image.Repository)
+func serviceImage(repo, tag, digest string, digests map[string]string, name string) string {
+	repo = strings.TrimSpace(repo)
 	if repo == "" {
 		return ""
 	}
-	digest := ""
-	if image.Digests != nil {
-		digest = strings.TrimSpace(image.Digests[name])
+	resolvedDigest := ""
+	if digests != nil {
+		resolvedDigest = strings.TrimSpace(digests[name])
 	}
-	if digest == "" {
-		digest = strings.TrimSpace(image.Digest)
+	if resolvedDigest == "" {
+		resolvedDigest = strings.TrimSpace(digest)
 	}
-	if digest != "" {
-		return fmt.Sprintf("%s/%s@%s", repo, name, digest)
+	if resolvedDigest != "" {
+		return fmt.Sprintf("%s/%s@%s", repo, name, resolvedDigest)
 	}
-	tag := strings.TrimSpace(image.Tag)
+	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		tag = "latest"
 	}
@@ -295,40 +293,32 @@ func uiImage(values cpValues) string {
 	return fmt.Sprintf("%s/ui:%s", repo, tag)
 }
 
-func dataplaneImage(image struct {
-	Repository string
-	Tag        string
-	Digest     string
-}) string {
-	repo := strings.TrimSpace(image.Repository)
+func dataplaneImage(repo, tag, digest string) string {
+	repo = strings.TrimSpace(repo)
 	if repo == "" {
 		return ""
 	}
-	digest := strings.TrimSpace(image.Digest)
+	digest = strings.TrimSpace(digest)
 	if digest != "" {
 		return fmt.Sprintf("%s/dataplane@%s", repo, digest)
 	}
-	tag := strings.TrimSpace(image.Tag)
+	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		tag = "latest"
 	}
 	return fmt.Sprintf("%s/dataplane:%s", repo, tag)
 }
 
-func testImage(image struct {
-	Repository string
-	Tag        string
-	Digest     string
-}) string {
-	repo := strings.TrimSpace(image.Repository)
+func testImage(repo, tag, digest string) string {
+	repo = strings.TrimSpace(repo)
 	if repo == "" {
 		return ""
 	}
-	digest := strings.TrimSpace(image.Digest)
+	digest = strings.TrimSpace(digest)
 	if digest != "" {
 		return fmt.Sprintf("%s@%s", repo, digest)
 	}
-	tag := strings.TrimSpace(image.Tag)
+	tag = strings.TrimSpace(tag)
 	if tag == "" {
 		tag = "latest"
 	}

@@ -35,17 +35,17 @@ export function Breadcrumbs() {
   });
 
   return (
-    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+    <nav aria-label="Breadcrumb" className="flex flex-wrap items-center gap-2 text-xs text-white/60">
       {crumbs.map((crumb, index) => (
         <span key={`${crumb.href}-${index}`} className="flex items-center gap-2">
           {crumb.isLast ? (
-            <span className="text-foreground">{crumb.label}</span>
+            <span className="text-white">{crumb.label}</span>
           ) : (
-            <Link href={crumb.href} className="hover:text-foreground">
+            <Link href={crumb.href} className="hover:text-white">
               {crumb.label}
             </Link>
           )}
-          {crumb.isLast ? null : <span className="text-muted-foreground">/</span>}
+          {crumb.isLast ? null : <span className="text-white/40">/</span>}
         </span>
       ))}
     </nav>

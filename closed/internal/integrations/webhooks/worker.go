@@ -242,24 +242,25 @@ func (w *Worker) resolveSigningSecret(ctx context.Context, projectID, classRef s
 	if classRef == "" {
 		return "", nil
 	}
-	if w.secrets == nil {
-		return "", errSecretUnavailable
-	}
-	lease, err := w.secrets.Fetch(ctx, secrets.Request{
-		ProjectID: strings.TrimSpace(projectID),
-		Subject:   "webhook",
-		ClassRef:  classRef,
-	})
-	if err != nil {
-		return "", err
-	}
 	key := strings.TrimSpace(w.cfg.SigningSecretKey)
 	if key == "" {
 		key = "WEBHOOK_SIGNING_SECRET"
 	}
-	value := strings.TrimSpace(lease.Env[key])
-	if value == "" {
-		return "", fmt.Errorf("%w: %s", errSecretKeyMissing, key)
+	value, err := secrets.FetchIntegrationSecret(ctx, w.secrets, secrets.IntegrationSecret{
+		ProjectID: strings.TrimSpace(projectID),
+		Scope:     secrets.IntegrationScopeWebhook,
+		ClassRef:  classRef,
+		Key:       key,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, secrets.ErrIntegrationSecretUnavailable):
+			return "", errSecretUnavailable
+		case errors.Is(err, secrets.ErrIntegrationSecretKeyMissing):
+			return "", errSecretKeyMissing
+		default:
+			return "", err
+		}
 	}
 	return value, nil
 }

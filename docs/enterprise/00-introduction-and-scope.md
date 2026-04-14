@@ -1,37 +1,25 @@
-# 00. Introduction and Scope
+# 00. Введение и область применения
 
-## 00.1 Purpose and normative status
+## 00.1 Назначение и нормативный статус
+Документ фиксирует целевое production‑состояние Animus Datalab, что снижает риск расхождения между архитектурными обещаниями и фактическим поведением.
 
-This document defines the target production-grade state of Animus Datalab. It specifies architectural and domain invariants, security and operational constraints, responsibilities, and failure behavior for regulated on-premise and air-gapped deployments.
+Документ применяется как нормативная основа для:
+- архитектурного и безопасностного обзора, что снижает риск принятия решений без критериев;
+- комплаенс‑оценки и онбординга, что снижает риск несоответствия регуляторным требованиям;
+- приёмки и аудита, что снижает риск спорных трактовок результатов;
+- оценки операционной готовности, что снижает риск нестабильной эксплуатации.
 
-This document is the normative basis for:
+## 00.2 Аудитория и предпосылки
+Документ рассчитан на специалистов, знакомых с ML‑системами, распределёнными сервисами, контейнеризацией и практиками безопасности, что снижает риск неправильного чтения терминов.
 
-- architecture and security review;
-- enterprise onboarding and compliance assessment;
-- acceptance and audit criteria;
-- operational readiness evaluation.
+Документ не является руководством пользователя и не подменяет эксплуатационные процедуры.
 
-## 00.2 Audience and prerequisites
+## 00.3 Статус и управление изменениями
+Спецификация описывает целевое состояние системы и не привязана к конкретному релизу, что снижает риск устаревания выводов при смене версий.
 
-This document is intended for readers familiar with:
+Архитектурные изменения фиксируются в ADR, что сохраняет прослеживаемость решений и снижает риск скрытых корректировок требований.
 
-- machine learning systems;
-- distributed systems;
-- containerization and Kubernetes;
-- enterprise security and access control.
+## 00.4 Область применения
+Спецификация применяется к развёртываниям on‑prem, private cloud и air‑gapped, что снижает риск использования неподходящих практик для изолированных контуров.
 
-This document is not a tutorial and does not provide usage guidance.
-
-## 00.3 Document status and change control
-
-This specification describes the target state of the system and is not tied to a specific implementation release.
-
-Architectural changes are captured in Architecture Decision Records (ADR). ADRs document decisions prospectively and do not retroactively change the meaning of this specification.
-
-All specification documents use a consistent status lifecycle: Draft -> Review -> Approved.
-
-## 00.4 Scope and applicability
-
-This specification applies to Animus Datalab deployments in on-premise, private cloud, and air-gapped environments.
-
-Canonical terminology is defined in the glossary (Section 14). Non-goals and explicit exclusions are consolidated in Section 13.
+Терминология определена в глоссарии (раздел 14), а не‑цели консолидированы в разделе 13.

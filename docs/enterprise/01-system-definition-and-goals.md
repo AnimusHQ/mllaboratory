@@ -1,41 +1,27 @@
-# 01. System Definition and Goals
+# 01. Определение системы и цели
 
-## 01.1 System definition
+## 01.1 Определение
+Animus Datalab фиксирует полный жизненный цикл ML‑разработки в управляемом контуре, что снижает риск потери воспроизводимости и контекста между стадиями.
 
-Animus Datalab is an enterprise digital laboratory for machine learning, intended to organize the full ML development lifecycle in a managed and reproducible form.
+Система объединяет работу с данными, экспериментами, обучением и подготовкой моделей к промышленному использованию, что снижает риск расхождения правил исполнения и аудита между командами.
 
-The platform unifies:
+## 01.2 Цели
+1. Обеспечить формальную воспроизводимость экспериментов и прозрачность результатов, снижая риск утраты научной ценности.
+2. Представить контекст разработки (данные, код, окружение, параметры, решения) как явную систему записей, снижая риск «скрытого» состояния.
+3. Предоставить рабочую среду без нарушения корпоративных требований, снижая риск блокировки исследований из‑за комплаенса.
+4. Обеспечить управление, аудит и безопасность как неизменяемые свойства, снижая риск несанкционированных операций.
 
-- data work;
-- experiments;
-- model training and evaluation;
-- preparation of models for production use
+## 01.3 Границы системы
+Animus Datalab не является:
+- системой контроля исходного кода;
+- IDE как самостоятельным продуктом;
+- платформой инференса.
 
-within a single operational context with common execution, security, and audit rules.
+Интеграция с SCM, IDE‑средами и внешними контурами развёртывания допустима при сохранении доменных инвариантов; подробные исключения приведены в разделе 13.
 
-## 01.2 Platform goals
-
-1. Ensure reproducibility of ML experiments and results.
-2. Represent the full model development context (data, code, environment, parameters, decisions) as an explicit and connected system of records.
-3. Provide a managed working environment for ML developers without violating enterprise requirements.
-4. Provide governance, audit, and security by default.
-
-## 01.3 System boundaries
-
-Animus Datalab is not:
-
-- a source code version control system;
-- an IDE as a product;
-- a full inference platform.
-
-The platform can integrate with external SCM (Git), IDEs as managed environments, and external deployment and serving systems. Detailed exclusions are consolidated in Section 13.
-
-## 01.4 Architectural invariants
-
-The following invariants are mandatory and must not be violated:
-
-1. Control Plane does not execute user code.
-2. Any production-run is uniquely defined by data version, code commit SHA, and a locked environment.
-3. All significant actions are recorded as AuditEvent.
-4. Data, code, environments, and results are explicit, versioned entities.
-5. The system has no hidden state that affects execution results.
+## 01.4 Архитектурные инварианты
+1. Control Plane не исполняет пользовательский код, что снижает риск компрометации управляющей плоскости.
+2. Production‑Run определяется `DatasetVersion`, `CodeRef` (commit SHA), `EnvironmentLock` и `PolicySnapshot`, что снижает риск неоднозначной воспроизводимости.
+3. Все существенные действия фиксируются в `AuditEvent`, что снижает риск спорных интерпретаций истории.
+4. Данные, код, окружения и результаты представлены как явные версионируемые сущности, что снижает риск скрытого состояния.
+5. Скрытое состояние, влияющее на результат исполнения, запрещено, что снижает риск невалидных выводов.

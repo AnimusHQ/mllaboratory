@@ -40,6 +40,21 @@ paths:
                 $ref: "#/components/schemas/SessionResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+  /api/auth/me:
+    get:
+      summary: Get current session identity (UI)
+      tags: [Auth]
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthMeResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
   /auth/logout:
     post:
       summary: Logout (clears session cookie)
@@ -809,6 +824,7 @@ paths:
           type: string
     post:
       summary: Request model export
+      description: Export is allowed only for approved versions with satisfied policy decisions (deny-by-default).
       tags: [Models]
       security:
         - bearerAuth: []
@@ -1065,6 +1081,19 @@ components:
       required: [subject, email, roles]
       properties:
         subject:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+    AuthMeResponse:
+      type: object
+      additionalProperties: false
+      required: [user_id, roles]
+      properties:
+        user_id:
           type: string
         email:
           type: string

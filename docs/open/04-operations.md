@@ -1,19 +1,18 @@
-# Operations (Open Integration Scope)
+# Операции (интеграционный взгляд)
 
-This repository does not include the closed-core services, UI, or deployment tooling. Operational guidance for running the control plane is distributed separately with the closed-core delivery.
+Документ фиксирует интеграционные ожидания: какие проверки и артефакты должны быть доступны при эксплуатации, что снижает риск утраты воспроизводимости и доказательности.
 
-## Integration considerations
+## Минимальные условия эксплуатации
+- Доступность Gateway для пользователей и CI снижает риск «разрыва» между исполнением и фиксацией контекста.
+- Секреты и токены размещаются в защищённом хранилище, что снижает риск утечки и компрометации сессий.
+- Run‑scoped токены не логируются, что снижает риск несанкционированного повторного использования.
 
-- Ensure the gateway endpoint is reachable from CI and training containers.
-- Manage auth tokens and CI webhook secrets in a secure secret store.
-- Treat run-scoped tokens as short-lived secrets and avoid logging them.
+## Evidence и аудит
+- Evidence‑артефакты извлекаются через Gateway и проверяются по схемам, что снижает риск недостоверной доказательной базы.
+- AuditEvent экспортируется в SIEM, что снижает риск потери событий при инцидентах.
 
-## Evidence verification
-
-Evidence bundles and execution ledgers are retrieved over the gateway API and verified using documented schemas.
-
-## Related docs
-
-- [05-api.md](05-api.md)
-- [07-evidence-format.md](07-evidence-format.md)
-- [08-troubleshooting.md](08-troubleshooting.md)
+## Где искать подробности
+- `docs/ops/observability.md`
+- `docs/ops/backup-restore.md`
+- `docs/ops/dr-game-day.md`
+- `docs/ops/failure-modes.md`

@@ -1,32 +1,28 @@
-# Documentation Index (Open Integration Layer)
+# Индекс документации (интеграционный контур)
 
-This repository contains the open integration layer for Animus DataPilot: OpenAPI specs, SDKs, demo clients, and documentation. The closed-core control plane services and UI are not part of this repo.
+## Назначение
+Документы описывают интеграционный контур Animus Datalab: контракты API, способы подключения и операционные ожидания. Подробные эксплуатационные процедуры находятся в `docs/ops/`.
 
-## Start here
+## Старт
+- Обзор: [00-overview.md](00-overview.md)
+- Архитектура и принципы: [01-architecture.md](01-architecture.md)
+- Безопасность и комплаенс: [02-security-and-compliance.md](02-security-and-compliance.md)
+- API‑контракты: [05-api.md](05-api.md)
 
-- Overview: [00-overview.md](00-overview.md)
-- Architecture: [01-architecture.md](01-architecture.md)
-- Security and compliance (integration view): [02-security-and-compliance.md](02-security-and-compliance.md)
-- API usage: [05-api.md](05-api.md)
-
-## Reference guides
-
-- Deployment notes (open repo scope): [03-deployment.md](03-deployment.md)
-- Operations notes (open repo scope): [04-operations.md](04-operations.md)
-- CLI and end-to-end usage: [06-cli-and-usage.md](06-cli-and-usage.md)
-- Evidence format and verification: [07-evidence-format.md](07-evidence-format.md)
-- Troubleshooting: [08-troubleshooting.md](08-troubleshooting.md)
+## Практика использования
+- Развёртывание (интеграционный взгляд): [03-deployment.md](03-deployment.md)
+- Операции (интеграционный взгляд): [04-operations.md](04-operations.md)
+- CLI и сценарии: [06-cli-and-usage.md](06-cli-and-usage.md)
+- Evidence‑формат и проверка: [07-evidence-format.md](07-evidence-format.md)
+- Диагностика: [08-troubleshooting.md](08-troubleshooting.md)
 - FAQ: [09-faq.md](09-faq.md)
-- Glossary: [10-glossary.md](10-glossary.md)
+- Глоссарий: [10-glossary.md](10-glossary.md)
 
-## Artifacts in this repo
+## Артефакты в репозитории
+- OpenAPI‑спеки: [open/api/openapi/](../../open/api/openapi/)
+- SDK (Python): [open/sdk/python/](../../open/sdk/python/)
+- Демонстрационные клиенты: [open/cmd/demo/](../../open/cmd/demo/), [open/demo/](../../open/demo/)
 
-- OpenAPI specs: [open/api/openapi/](../../open/api/openapi/)
-- Python SDK: [open/sdk/python/](../../open/sdk/python/)
-- Demo CLI and datasets: [open/cmd/demo/](../../open/cmd/demo/), [open/demo/](../../open/demo/)
-
-## Related docs
-
-- [00-overview.md](00-overview.md)
-- [05-api.md](05-api.md)
-- [06-cli-and-usage.md](06-cli-and-usage.md)
+## Дополнительные документы
+- Эксплуатация: `docs/ops/`
+- Контракты: `docs/contracts/index.md`

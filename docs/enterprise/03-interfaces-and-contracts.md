@@ -1,154 +1,56 @@
-# 03.6 Interfaces and Contracts
+# 03.6 Интерфейсы и контракты
 
-## 03.6.1 Interface principles
+## 03.6.1 Принципы
+- API является источником истины для операций над сущностями, что снижает риск «скрытых» интерфейсов.
+- UI, CLI и SDK используют только публичные API, что снижает риск обхода политик.
+- Контракты версионируются, что снижает риск непредсказуемых breaking‑changes.
+- Критические операции идемпотентны, что снижает риск дублей при сбоях сети.
 
-Interfaces are part of the architectural contract and follow these principles:
+## 03.6.2 Ресурсная модель API
+Каждая доменная сущность является адресуемым ресурсом с явным жизненным циклом, что снижает риск неоднозначных состояний.
 
-- API is the source of truth for all operations on entities.
-- UI does not use hidden or unstable interfaces.
-- CLI and SDK are built on top of the public API.
-- Interfaces are versioned; compatibility and breaking changes are governed by the versioning policy (Section 10).
-- Critical operations must be idempotent and repeatable.
+**Базовые свойства API:**
+- строгая аутентификация и авторизация;
+- машинно‑читаемые ошибки;
+- корреляция запросов через `request_id`.
 
-## 03.6.2 API resource model
+**Канонические ресурсы:**
+Project, Dataset/DatasetVersion, EnvironmentDefinition/EnvironmentLock, Run/PipelineRun, Artifact, Model/ModelVersion, AuditEvent.
 
-The API follows a resource model in which each domain entity is an addressable resource with an explicit lifecycle.
+## 03.6.3 Семантика операций
+- **Create**: атомарность и аудит → снижает риск частичного создания.
+- **Read**: выдача данных в пределах RBAC → снижает риск утечки.
+- **Update**: допускается только для изменяемых сущностей → снижает риск «дрейфа» неизменяемых объектов.
+- **Delete**: подчиняется retention/legal‑hold → снижает риск незаконного удаления.
 
-Baseline API characteristics:
+## 03.6.4 Ошибки и диагностика
+Единый формат ошибок обеспечивает корректную обработку и снижает риск неверной интерпретации:
 
-- implementation may use REST or gRPC while preserving the contract;
-- strict authentication and authorization;
-- explicit, machine-readable errors;
-- correlation/request ID support.
-
-Canonical resource set includes:
-
-- Project;
-- Dataset and DatasetVersion;
-- EnvironmentDefinition and EnvironmentLock;
-- Run and PipelineRun;
-- Artifact;
-- Model and ModelVersion;
-- AuditEvent.
-
-Each resource must support:
-
-- retrieval (GET);
-- creation (POST);
-- filtering and search within access rights;
-- change history where applicable.
-
-## 03.6.3 Operation semantics
-
-Create:
-
-- creation must be atomic;
-- invariant violations return errors;
-- successful creation is recorded in AuditEvent.
-
-Read:
-
-- data is returned strictly within access rights;
-- missing access returns an explicit reasoned error.
-
-Update:
-
-- permitted only for entities with mutable state;
-- immutable entities do not allow updates.
-
-Delete:
-
-- physical deletion is restricted by retention and legal hold policies;
-- logical deletion (archive/deprecate) is preferred.
-
-## 03.6.4 Errors and diagnostics
-
-API errors must be:
-
-- typed;
-- machine-readable;
-- accompanied by diagnostic context.
-
-Minimum error fields:
-
-- `error_code`;
-- `message`;
-- `details`;
+- `error` (код);
+- `message` (краткое описание, если предусмотрено);
+- `details` (валидация, если предусмотрено);
 - `request_id`.
 
 ## 03.6.5 Pipeline Specification
+Pipeline Specification задаёт DAG‑структуру исполнения и не содержит исполнимого кода, что снижает риск скрытых зависимостей.
 
-Pipeline Specification (see Section 14) describes the declarative structure of ML execution and serves as the orchestration contract. Pipeline Specification does not contain executable code.
+Перед созданием PipelineRun Control Plane валидирует DAG и ссылки, что снижает риск некорректных запусков.
 
-Pipeline Specification must include:
+## 03.6.6 События и интеграции
+События отражают изменения состояния и не являются источником истины, что снижает риск конкурирующих представлений.
 
-- identifier and specification version;
-- list of steps (nodes);
-- dependencies between steps;
-- step inputs and outputs;
-- error and retry policies;
-- resource requirements.
+Минимальный набор событий:
+- `RunFinished`
+- `ModelApproved`
+- `DatasetVersionCreated`
 
-Before creating a PipelineRun, Control Plane must:
+Доставка реализуется через webhook, повторная доставка допускается, что снижает риск потери событий при временных сбоях.
 
-- validate DAG correctness (no cycles);
-- validate all references;
-- validate against security policies;
-- reject the specification on invariant violations.
-
-## 03.6.6 Events and integrations
-
-Events reflect state changes and are not a source of truth.
-
-Minimum required event set:
-
-- `DatasetVersionCreated`;
-- `RunStarted`;
-- `RunFinished`;
-- `PipelineRunFinished`;
-- `ModelVersionCreated`;
-- `ModelApproved`;
-- `AuditEventExported`.
-
-Each event must:
-
-- include a reference to the object;
-- include a timestamp;
-- be safely redeliverable without breaking consistency.
-
-Supported delivery mechanisms:
-
-- webhook;
-- message broker;
-- export to SIEM/observability systems.
-
-The system must account for redelivery and temporary receiver outages.
-
-## 03.6.7 CLI and SDK
-
-CLI and SDK are used for automation, CI/CD integration, and non-UI usage.
-
-Requirements:
-
-- CLI and SDK use the API and do not bypass Control Plane policies;
-- authentication via SSO or service accounts is supported;
-- CLI is scriptable and returns machine-readable results;
-- SDK mirrors the API resource model and does not hide errors or platform constraints.
+## 03.6.7 CLI и SDK
+CLI/SDK используют публичный API и не обходят политики, что снижает риск неконтролируемых операций.
 
 ## 03.6.8 UI
+UI отображает состояние и не является логическим источником, что снижает риск расхождения между визуализацией и фактами.
 
-UI is a visual representation of platform state and is not a logic source.
-
-UI must not:
-
-- perform actions not available through the API;
-- hide information required for audit or diagnostics.
-
-## 03.6.9 Interfaces, security, and audit
-
-Every interaction via interfaces must:
-
-- be authenticated;
-- be authorized against access policies;
-- be recorded in audit;
-- be traceable via request/correlation ID.
+## 03.6.9 Безопасность интерфейсов
+Каждое взаимодействие проходит аутентификацию и авторизацию и фиксируется в аудите, что снижает риск неотслеживаемых действий.

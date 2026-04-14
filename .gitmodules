@@ -1,3 +1,7 @@
-[submodule "open/sdk"]
-	path = open/sdk
-	url = https://github.com/grewanderer/animus-datalab-sdk
+[submodule "enterprise"]
+	path = enterprise
+	url = TODO_ENTERPRISE_REPO_URL
+
+[submodule "sdk"]
+	path = sdk
+	url = TODO_SDK_REPO_URL

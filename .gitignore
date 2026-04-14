@@ -28,6 +28,8 @@
 # Next.js build output
 .next/
 frontend/.next/
+**/.next/
+**/dist-test/
 
 # Dependencies
 node_modules/
@@ -37,6 +39,7 @@ bin/
 *.out
 .cache/
 .gocache/
+artifacts/
 
 # Python
 __pycache__/

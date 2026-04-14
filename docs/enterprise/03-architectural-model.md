@@ -1,91 +1,50 @@
-# 03. Architectural Model
+# 03. Архитектурная модель
 
-## 03.1 Architecture overview
+## 03.1 Обзор
+Система разделяет Control Plane и Data Plane, что снижает риск исполнения недоверенного кода в управляющей плоскости и сохраняет целостность метаданных при сбоях исполнения.
 
-Animus is a distributed system with a strict separation of responsibilities between Control Plane and Data Plane.
-
-- Control Plane manages governance, policies, metadata, audit, and orchestration.
-- Data Plane executes user code in isolated environments and handles data and Artifact access.
-
-The separation is an architectural invariant and is required for:
-
-1. security, by preventing untrusted code execution in the management plane;
-2. scaling, by independently scaling management and execution;
-3. reliability, by preserving metadata and audit consistency when Data Plane fails.
+- Control Plane управляет политиками, метаданными, аудитом и планированием, что снижает риск неявных решений и потери доказательности.
+- Data Plane исполняет пользовательский код в изоляции, что снижает риск воздействия выполнения на управляющую плоскость.
 
 ## 03.2 Control Plane
+Control Plane выполняет:
+- внешние интерфейсы и контракт API, что снижает риск расхождения интеграций;
+- хранение доменных метаданных, что снижает риск утраты контекста;
+- планирование исполнения, что снижает риск неконсистентных запусков;
+- применение политик доступа и безопасности, что снижает риск несанкционированных операций;
+- формирование `AuditEvent`, что снижает риск спорных интерпретаций истории.
 
-Control Plane implements the management plane and provides:
-
-- external interfaces and API contract (see Section 03.6);
-- storage and management of domain metadata;
-- orchestration and execution planning;
-- enforcement of access, security, resource, and retention policies;
-- generation of AuditEvent.
-
-Constraints:
-
-- Control Plane does not execute user code.
-- Control Plane does not require data access sufficient for execution; references and metadata are sufficient.
+Ограничения:
+- Control Plane не исполняет пользовательский код, что снижает риск компрометации управляющей плоскости.
+- Control Plane не требует доступа к данным для исполнения, что снижает риск утечки.
 
 ## 03.3 Data Plane
+Data Plane обеспечивает:
+1. исполнение пользовательского кода в контейнерной изоляции, что снижает риск влияния одного запуска на другой;
+2. контроль ресурсов (CPU/GPU/RAM/ephemeral), что снижает риск неконтролируемого потребления;
+3. управляемый доступ к данным и артефактам, что снижает риск неконтролируемых каналов;
+4. сбор логов, метрик и статусов, что снижает риск потери наблюдаемости.
 
-Data Plane implements the execution plane and provides:
+Базовые требования исполнения:
+- Kubernetes как среда исполнения;
+- изоляция каждого Run;
+- окружение фиксируется `EnvironmentLock`;
+- сетевой доступ управляется политиками.
 
-1. execution of user code in containerized environments;
-2. isolation of compute and resources;
-3. controlled access to data and Artifact;
-4. collection of logs, metrics, and execution traces.
+Секреты выдаются только на время исполнения, что снижает риск утечки через UI и контрольные сервисы; попытки доступа фиксируются в аудите.
 
-Baseline execution requirements:
+## 03.4 Границы доверия
+Система разделяет зоны доверия:
+1. Пользовательские клиенты (UI/CLI/SDK) считаются недоверенными, что снижает риск обхода политики.
+2. Control Plane — доверенная зона управления без исполнения кода.
+3. Data Plane — зона исполнения недоверенного кода с изоляцией.
+4. Внешние системы (SCM, registry, vault, storage, SIEM) интегрируются по контрактам, что снижает риск неучтённых каналов.
 
-- Kubernetes is the required execution environment;
-- each Run executes in an isolated environment;
-- Run resources are explicitly defined (CPU/GPU/RAM/ephemeral storage);
-- Run environment is defined by EnvironmentLock;
-- network policies are enforced at execution.
+## 03.5 Модель отказов
+Система исходит из нормальности отказов распределённых компонентов, что снижает риск неконтролируемых деградаций.
 
-Data and Artifact access is provided through controlled mechanisms:
-
-- reading DatasetVersion from allowed sources;
-- writing Artifact to object storage;
-- support for read-only sources;
-- binding results to Project and Run.
-
-Data Plane does not provide unaudited channels for data access outside platform policy.
-
-Secrets are provided to execution:
-
-- temporarily;
-- in the minimal required scope;
-- without exposing values in UI or logs;
-- with access attempts recorded in audit.
-
-## 03.4 Trust boundaries
-
-Animus distinguishes the following trust zones:
-
-1. User clients (UI/CLI/SDK) are untrusted and require strict authentication and authorization.
-2. Control Plane is a trusted management zone that does not execute user code.
-3. Data Plane is a partially trusted execution zone that runs untrusted code and isolates it.
-4. External systems (SCM, registry, vault, storage, SIEM) are separate trust zones integrated through contractual interfaces.
-
-Trust boundaries define requirements for network policies, least privilege, action logging, and isolation.
-
-Security requirements and the formal threat model are specified in Sections 08 and 11.
-
-## 03.5 Failure model (principled failure model)
-
-Animus is designed with the assumption that failure is a normal mode of distributed systems.
-
-Failure behavior requirements:
-
-- Control Plane operations are idempotent where possible;
-- Run status transitions must converge to consistent states (for example, `unknown` or `reconciling`) on loss of Data Plane connectivity;
-- the system must provide reconciliation mechanisms that restore observed state after temporary component loss;
-- failure scenarios must be observable through metrics, logs, and tracing.
-
-Degradation principle:
-
-- Data Plane failure must not cause loss of metadata for already created entities or audit history;
-- active executions may be interrupted and marked accordingly, with preserved context and cause.
+Требования:
+- операции Control Plane идемпотентны там, где возможно, что снижает риск дублей;
+- статусы Run сходятся к согласованным состояниям при потере связи с Data Plane, что снижает риск «зависших» процессов;
+- механизм reconciliation восстанавливает наблюдаемое состояние, что снижает риск расхождения фактов и записи;
+- отказ должен быть наблюдаем через метрики и логи, что снижает риск «немых» сбоев.

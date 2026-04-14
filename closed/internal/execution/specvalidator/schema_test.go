@@ -9,8 +9,21 @@ import (
 )
 
 func TestPipelineSpecSchemaLoads(t *testing.T) {
-	path := filepath.Join("..", "..", "..", "..", "api", "pipeline_spec.yaml")
-	raw, err := os.ReadFile(path)
+	candidatePaths := []string{
+		filepath.Join("..", "..", "..", "..", "core", "contracts", "pipeline_spec.yaml"),
+		filepath.Join("..", "..", "..", "..", "api", "pipeline_spec.yaml"),
+	}
+
+	var (
+		raw []byte
+		err error
+	)
+	for _, path := range candidatePaths {
+		raw, err = os.ReadFile(path)
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
 		t.Fatalf("read schema: %v", err)
 	}

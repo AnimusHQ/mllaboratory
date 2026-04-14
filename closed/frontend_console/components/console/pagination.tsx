@@ -23,7 +23,7 @@ export function Pagination({ page, totalPages, param = 'page' }: { page: number;
       <Button variant="secondary" size="sm" onClick={() => setPage(Math.max(1, page - 1))} disabled={page <= 1}>
         Назад
       </Button>
-      <div className="text-xs text-muted-foreground">
+      <div className="text-xs text-white/60">
         Страница {page} из {totalPages}
       </div>
       <Button

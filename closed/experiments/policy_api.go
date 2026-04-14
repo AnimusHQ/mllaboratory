@@ -1358,295 +1358,46 @@ func (api *experimentsAPI) handleApprovePolicyApproval(w http.ResponseWriter, r 
 		return
 	}
 
-	var (
-		experimentID     string
-		datasetVersionID sql.NullString
-	)
-	err = tx.QueryRowContext(
-		r.Context(),
-		`SELECT experiment_id,
-				dataset_version_id
-		 FROM experiment_runs
-		 WHERE run_id = $1
-		 FOR UPDATE`,
-		runID,
-	).Scan(&experimentID, &datasetVersionID)
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	var (
-		contextRaw []byte
-	)
-	err = tx.QueryRowContext(
-		r.Context(),
-		`SELECT context
-		 FROM policy_decisions
-		 WHERE decision_id = $1`,
-		decisionID,
-	).Scan(&contextRaw)
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-	var policyCtx policy.Context
-	if err := json.Unmarshal(contextRaw, &policyCtx); err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	if api.trainingExecutor == nil {
-		api.writeError(w, r, http.StatusNotImplemented, "training_executor_disabled")
-		return
-	}
-	kind := strings.TrimSpace(api.trainingExecutor.Kind())
-	if kind == "" {
-		api.writeError(w, r, http.StatusInternalServerError, "invalid_training_executor")
-		return
-	}
-	if api.runTokenTTL <= 0 || strings.TrimSpace(api.runTokenSecret) == "" {
-		api.writeError(w, r, http.StatusInternalServerError, "training_token_not_configured")
-		return
-	}
-	if strings.TrimSpace(api.datapilotURL) == "" {
-		api.writeError(w, r, http.StatusInternalServerError, "datapilot_url_not_configured")
-		return
-	}
-
-	imageRef := strings.TrimSpace(policyCtx.Image.Ref)
-	imageDigest := strings.TrimSpace(policyCtx.Image.Digest)
-	imageExecutionRef := imageRef
-	if kind == "docker" {
-		if policyCtx.Meta != nil {
-			if metaRef, ok := policyCtx.Meta["image_execution_ref"].(string); ok && strings.TrimSpace(metaRef) != "" {
-				imageExecutionRef = strings.TrimSpace(metaRef)
-			}
-		}
-		if imageExecutionRef == imageRef && imageDigest != "" {
-			imageExecutionRef = imageDigest
-		}
-	}
-	if imageExecutionRef == "" {
-		api.writeError(w, r, http.StatusBadRequest, "image_ref_required")
-		return
-	}
-
-	k8sNamespace := ""
-	k8sJobName := ""
-	dockerName := ""
-	switch kind {
-	case "kubernetes_job":
-		k8sNamespace = api.trainingNamespace
-		if k8sNamespace == "" {
-			api.writeError(w, r, http.StatusInternalServerError, "training_namespace_not_configured")
-			return
-		}
-		k8sJobName = "animus-run-" + runID
-	case "docker":
-		dockerName = "animus-run-" + runID
-	default:
-		api.writeError(w, r, http.StatusInternalServerError, "invalid_training_executor")
-		return
-	}
-
-	resources := policyCtx.Resources
-	if resources == nil {
-		resources = map[string]any{}
-	}
-	resourcesJSON, err := json.Marshal(resources)
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "invalid_resources")
-		return
-	}
-
 	now := time.Now().UTC()
-	runToken, err := auth.GenerateRunToken(api.runTokenSecret, auth.RunTokenClaims{
-		RunID:            runID,
-		DatasetVersionID: strings.TrimSpace(datasetVersionID.String),
-		ExpiresAtUnix:    now.Add(api.runTokenTTL).Unix(),
-	}, now)
-	if err != nil {
+	if err := api.insertRunEvent(r.Context(), tx, runID, identity.Subject, "info", "run approved; awaiting dataplane dispatch", map[string]any{
+		"approved_by":       identity.Subject,
+		"approval_id":       approvalID,
+		"dispatch_required": true,
+	}); err != nil {
 		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
 		return
 	}
-
-	executionID := uuid.NewString()
-	type executionIntegrityInput struct {
-		ExecutionID      string          `json:"execution_id"`
-		RunID            string          `json:"run_id"`
-		Executor         string          `json:"executor"`
-		ImageRef         string          `json:"image_ref"`
-		ImageDigest      string          `json:"image_digest"`
-		Resources        json.RawMessage `json:"resources"`
-		K8sNamespace     string          `json:"k8s_namespace,omitempty"`
-		K8sJobName       string          `json:"k8s_job_name,omitempty"`
-		DockerContainer  string          `json:"docker_container_id,omitempty"`
-		DatapilotURL     string          `json:"datapilot_url"`
-		CreatedAt        time.Time       `json:"created_at"`
-		CreatedBy        string          `json:"created_by"`
-		RunTokenSHA256   string          `json:"run_token_sha256"`
-		DatasetVersionID string          `json:"dataset_version_id"`
-	}
-	runTokenSum := sha256Hex(runToken)
-	executionIntegrity, err := integritySHA256(executionIntegrityInput{
-		ExecutionID:      executionID,
-		RunID:            runID,
-		Executor:         kind,
-		ImageRef:         imageRef,
-		ImageDigest:      imageDigest,
-		Resources:        resourcesJSON,
-		K8sNamespace:     k8sNamespace,
-		K8sJobName:       k8sJobName,
-		DockerContainer:  dockerName,
-		DatapilotURL:     api.datapilotURL,
-		CreatedAt:        now,
-		CreatedBy:        identity.Subject,
-		RunTokenSHA256:   runTokenSum,
-		DatasetVersionID: strings.TrimSpace(datasetVersionID.String),
-	})
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
-	res, err := tx.ExecContext(
-		r.Context(),
-		`INSERT INTO experiment_run_executions (
-			execution_id,
-			run_id,
-			executor,
-			image_ref,
-			image_digest,
-			resources,
-			k8s_namespace,
-			k8s_job_name,
-			docker_container_id,
-			datapilot_url,
-			created_at,
-			created_by,
-			integrity_sha256
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
-		ON CONFLICT (run_id) DO NOTHING`,
-		executionID,
-		runID,
-		kind,
-		imageRef,
-		imageDigest,
-		resourcesJSON,
-		nullString(k8sNamespace),
-		nullString(k8sJobName),
-		nullString(dockerName),
-		api.datapilotURL,
-		now,
-		identity.Subject,
-		executionIntegrity,
-	)
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-	if rows, _ := res.RowsAffected(); rows == 0 {
-		api.writeError(w, r, http.StatusConflict, "execution_already_exists")
-		return
-	}
-
-	if _, _, err := api.insertExecutionLedgerEntry(r.Context(), tx, runID, executionID); err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "execution_ledger_failed")
-		return
-	}
-
-	pendingDetails := map[string]any{
-		"executor":           kind,
-		"image_ref":          imageRef,
-		"image_digest":       imageDigest,
-		"k8s_namespace":      k8sNamespace,
-		"k8s_job_name":       k8sJobName,
-		"docker_container":   dockerName,
-		"dataset_version_id": strings.TrimSpace(datasetVersionID.String),
-		"approved_by":        identity.Subject,
-	}
-	_, err = api.insertRunStateEvent(r.Context(), tx, runID, "pending", now, pendingDetails)
-	if err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-	if err := api.insertRunEvent(r.Context(), tx, runID, identity.Subject, "info", "run approved", pendingDetails); err != nil {
-		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
-		return
-	}
-
 	_, err = auditlog.Insert(r.Context(), tx, auditlog.Event{
 		OccurredAt:   now,
 		Actor:        identity.Subject,
-		Action:       "experiment_run.execute",
-		ResourceType: "experiment_run_execution",
-		ResourceID:   executionID,
+		Action:       "experiment_run.approved",
+		ResourceType: "experiment_run",
+		ResourceID:   runID,
 		RequestID:    r.Header.Get("X-Request-Id"),
 		IP:           requestIP(r.RemoteAddr),
 		UserAgent:    r.UserAgent(),
 		Payload: map[string]any{
-			"service":            "experiments",
-			"execution_id":       executionID,
-			"run_id":             runID,
-			"experiment_id":      experimentID,
-			"dataset_version_id": strings.TrimSpace(datasetVersionID.String),
-			"executor":           kind,
-			"image_ref":          imageRef,
-			"image_digest":       imageDigest,
-			"k8s_namespace":      k8sNamespace,
-			"k8s_job_name":       k8sJobName,
-			"docker_container":   dockerName,
-			"resources":          resources,
-			"datapilot_url":      api.datapilotURL,
-			"run_token_sha256":   runTokenSum,
-			"approved_by":        identity.Subject,
+			"service":           "experiments",
+			"run_id":            runID,
+			"approval_id":       approvalID,
+			"approval_status":   approvalStatusApproved,
+			"dispatch_required": true,
 		},
 	})
 	if err != nil {
 		api.writeError(w, r, http.StatusInternalServerError, "audit_failed")
 		return
 	}
-
 	if err := tx.Commit(); err != nil {
 		api.writeError(w, r, http.StatusInternalServerError, "internal_error")
 		return
 	}
-
-	spec := trainingJobSpec{
-		RunID:            runID,
-		DatasetVersionID: strings.TrimSpace(datasetVersionID.String),
-		ImageRef:         imageExecutionRef,
-		DatapilotURL:     api.datapilotURL,
-		Token:            runToken,
-		Resources:        resources,
-		K8sNamespace:     k8sNamespace,
-		K8sJobName:       k8sJobName,
-		DockerName:       dockerName,
-		JobKind:          "training",
-	}
-	if err := api.trainingExecutor.Submit(r.Context(), spec); err != nil {
-		_ = api.failRunExecution(r.Context(), identity, r, runID, executionID, kind, imageRef, err)
-		api.writeError(w, r, http.StatusBadGateway, "training_submit_failed")
-		return
-	}
-
-	currentStatus := "running"
-	if err := api.markRunRunning(r.Context(), identity, r, runID, executionID, kind, imageRef); err != nil {
-		currentStatus = "pending"
-		if api.logger != nil {
-			api.logger.Error("mark run running failed", "run_id", runID, "error", err)
-		}
-	}
-
-	w.Header().Set("Location", "/experiment-runs/"+runID)
 	api.writeJSON(w, http.StatusOK, map[string]any{
-		"run_id":          runID,
-		"execution_id":    executionID,
-		"run_status":      currentStatus,
-		"datapilot_url":   api.datapilotURL,
-		"approval_id":     approvalID,
-		"approval_status": approvalStatusApproved,
+		"approval_id":       approvalID,
+		"approval_status":   approvalStatusApproved,
+		"run_id":            runID,
+		"run_status":        "pending",
+		"dispatch_required": true,
 	})
 }
 

@@ -1,54 +1,39 @@
-# Overview
+# Обзор
 
-Animus DataPilot is an on-prem, air-gapped compatible control plane for datasets, experiments, lineage, and auditability. It enforces immutability and produces audit evidence for every write operation.
+## Назначение
+Animus Datalab обеспечивает формальную воспроизводимость экспериментов и прозрачность результатов, снижая риск утраты научной ценности, невозможности повторной проверки и повторного использования исследований в долгих программах.
 
-## Repository scope
+## Проблемы, которые устраняются
+- фиксирует входы эксперимента как явный контракт, что исключает зависимость от неявного состояния и снижает риск «невоспроизводимых» результатов;
+- связывает результаты с политикой исполнения и аудитом, что снижает риск регуляторных претензий и невозможности защитить выводы;
+- сохраняет контекст при передаче между командами и стадиями проекта, что снижает риск потери предпосылок, параметров и условий исполнения;
+- предоставляет рабочую среду для исследовательской и инженерной работы без нарушения корпоративных требований безопасности и комплаенса.
 
-This repository contains the **open integration layer**: OpenAPI specifications, SDKs, demo clients, and documentation. The control-plane services, UI, and deployment assets are closed-source and are not included here.
+## Что делает система
+- закрепляет воспроизводимость через явную привязку `DatasetVersion`, `CodeRef`, `EnvironmentLock` и `PolicySnapshot`, что обеспечивает проверяемость результатов и исключает «скрытые» зависимости;
+- разделяет управление и исполнение (Control Plane / Data Plane), что снижает риск запуска пользовательского кода в доверенной плоскости;
+- фиксирует действия в append‑only аудите и позволяет экспорт в SIEM, что снижает риск потери доказательной базы при инцидентах;
+- предоставляет DevEnv (IDE‑сессии) под теми же ограничениями governance, что и production‑Run, что снижает риск расхождения между исследованием и промышленным запуском.
 
-## Problem
+## Границы документации
+- **Продуктовые эффекты** зафиксированы здесь, что снижает риск неверной оценки целей и ожидаемого результата.
+- **Системное поведение** раскрыто в архитектурных разделах, что снижает риск разрыва между обещанием и причинно‑следственными гарантиями.
+- **Операционная реальность** описана в `docs/ops`, что снижает риск нестабильного развёртывания и неконтролируемого восстановления.
+- **Практика пользователя** описана в `docs/ops/start-here.md` и разделе о консоли, что снижает риск ошибочного входа и непроверяемых действий.
 
-Enterprise ML teams need deterministic, auditable runs that survive audits and security reviews. Traditional tooling often depends on outbound SaaS or mutable metadata, which is unacceptable in regulated or air-gapped environments.
+## Стартовый маршрут
+1. Вход и выбор/создание проекта (администратор при необходимости).
+2. Создание `Dataset` и `DatasetVersion`.
+3. Запуск `Run` или `PipelineRun` с явным набором входов.
+4. Получение артефактов и формирование evidence.
+5. Создание `ModelVersion` и экспорт при разрешении.
+6. Проверка аудита и (при необходимости) экспорт в SIEM.
 
-## Solution
+Подробный маршрут: `docs/ops/start-here.md`.
 
-Animus DataPilot provides:
-
-- Immutable dataset versions and experiment runs.
-- Explicit quality gates before downstream use.
-- Lineage edges that connect dataset -> run -> git commit -> image digest.
-- Audit logs and evidence bundles for compliance review.
-- A UI control plane (closed) and a minimal SDK (open) for CI and training containers.
-
-## Value propositions
-
-- Deterministic execution records tied to dataset hash, git commit, and image digest.
-- Audit-ready evidence bundles (ledger, lineage, audit slice, policy snapshot, report).
-- On-prem first deployment with no outbound dependencies for runtime operation.
-- Clear security boundaries (gateway-only access, signed internal headers, run tokens).
-
-## Personas
-
-- ML engineers: register datasets, run experiments, log metrics, and collect artifacts.
-- Platform engineers: deploy on-prem, enforce RBAC, manage upgrades and backups.
-- Security and compliance: review evidence bundles, audit trails, and lineage.
-- SRE/DevOps: monitor services and manage day-2 operations.
-
-## What this is
-
-- A deterministic control plane for ML metadata and execution evidence.
-- An open integration kit (schemas, SDKs, and demos) that targets the closed-core services.
-
-## What this is not
-
-- AutoML or training orchestration beyond container execution.
-- A notebook or labeling platform.
-- A multi-tenant SaaS billing system.
-
-## Related docs
-
-- [01-architecture.md](01-architecture.md)
-- [02-security-and-compliance.md](02-security-and-compliance.md)
-- [03-deployment.md](03-deployment.md)
-- [06-cli-and-usage.md](06-cli-and-usage.md)
-- [10-glossary.md](10-glossary.md)
+## Связанные документы
+- Архитектура и принципы: `docs/open/01-architecture.md`.
+- Безопасность и комплаенс: `docs/open/02-security-and-compliance.md`.
+- Развёртывание: `docs/open/03-deployment.md` и `docs/ops/helm-install.md`.
+- Операции: `docs/open/04-operations.md` и `docs/ops/`.
+- Контракты API: `docs/open/05-api.md` и `open/api/openapi/`.

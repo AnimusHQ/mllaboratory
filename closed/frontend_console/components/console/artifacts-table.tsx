@@ -51,7 +51,7 @@ export function ArtifactsTable({ artifacts, role }: { artifacts: RunArtifact[]; 
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <input
-          className="h-9 w-64 rounded-md border border-input bg-transparent px-3 text-sm"
+          className="h-9 w-64 rounded-xl border border-white/15 bg-[#0b1626]/80 px-3 text-sm text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
           placeholder="Поиск по ID, типу, имени"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
@@ -77,21 +77,21 @@ export function ArtifactsTable({ artifacts, role }: { artifacts: RunArtifact[]; 
                 <td className="font-mono text-xs">{artifact.artifact_id}</td>
                 <td>{artifact.kind}</td>
                 <td>{artifact.name ?? '—'}</td>
-                <td className="text-muted-foreground">{artifact.filename ?? artifact.object_key}</td>
-                <td className="font-mono text-xs text-muted-foreground">{artifact.sha256}</td>
-                <td className="text-xs text-muted-foreground">{artifact.size_bytes}</td>
+                <td className="text-white/60">{artifact.filename ?? artifact.object_key}</td>
+                <td className="font-mono text-xs text-white/60">{artifact.sha256}</td>
+                <td className="text-xs text-white/60">{artifact.size_bytes}</td>
                 <td className="space-y-1">
                   <div className="flex items-center gap-2">
                     <CopyButton value={artifact.artifact_id} />
                     {canRead ? (
                       <Link
                         href={`/api/experiments/experiment-runs/${artifact.run_id}/artifacts/${artifact.artifact_id}/download`}
-                        className="text-xs font-semibold text-primary"
+                        className="text-xs font-semibold text-accent hover:text-white"
                       >
                         Скачать
                       </Link>
                     ) : (
-                      <span className="text-xs text-muted-foreground">Скачивание недоступно</span>
+                      <span className="text-xs text-white/40">Скачивание недоступно</span>
                     )}
                   </div>
                   <PolicyHint allowed={canRead} capability="artifact:read" />

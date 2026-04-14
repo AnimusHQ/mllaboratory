@@ -43,9 +43,6 @@ type experimentsAPI struct {
 	evidenceSigningSecret string
 	gitlabWebhookSecret   string
 
-	trainingExecutor  trainingExecutor
-	trainingNamespace string
-
 	webhookConfig webhooks.Config
 
 	registryPolicyResolver registryverify.PolicyResolver
@@ -95,8 +92,6 @@ func newExperimentsAPI(
 	dataplaneURL string,
 	evidenceSigningSecret string,
 	gitlabWebhookSecret string,
-	trainingExecutor trainingExecutor,
-	trainingNamespace string,
 	registryPolicyResolver registryverify.PolicyResolver,
 	registryVerifyTimeout time.Duration,
 	registryProviders map[string]registryverify.Provider,
@@ -130,8 +125,6 @@ func newExperimentsAPI(
 		dataplaneURL:              strings.TrimSpace(dataplaneURL),
 		evidenceSigningSecret:     strings.TrimSpace(evidenceSigningSecret),
 		gitlabWebhookSecret:       strings.TrimSpace(gitlabWebhookSecret),
-		trainingExecutor:          trainingExecutor,
-		trainingNamespace:         strings.TrimSpace(trainingNamespace),
 		webhookConfig:             webhookConfig,
 		registryPolicyResolver:    registryPolicyResolver,
 		registryVerifyTimeout:     registryVerifyTimeout,

@@ -14,6 +14,17 @@
 make sbom
 ```
 
+**Проверка SBOM и digest-согласованности:**
+```bash
+make sbom-check
+```
+
+**Подпись образов и аттестация provenance (cosign):**
+```bash
+make sign-images
+make verify-images
+```
+
 **Скан уязвимостей:**
 ```bash
 make vuln-scan
@@ -42,7 +53,7 @@ make openapi-compat
 ## 3. Ожидаемый результат
 
 - Команды завершаются кодом `0`.
-- Артефакты сохраняются в `.cache/supply-chain/` и не добавляются в репозиторий.
+- Артефакты сохраняются в `artifacts/` (или `.cache/supply-chain/` для legacy-сканов) и не добавляются в репозиторий.
 
 ## 4. Откат и восстановление
 
@@ -55,7 +66,8 @@ rm -rf .cache/supply-chain
 ## 5. Диагностика при сбое
 
 - Проверьте наличие бинарей `syft`/`grype` в `$PATH`.
-- Для автоматической установки включите:
+- Для явной установки инструментов включите:
+  - `ANIMUS_INSTALL_TOOLS=1` для `syft`/`cosign`/`grype` в скриптах SBOM/подписи/уязвимостей.
   - `ANIMUS_SAST_INSTALL=1` для SAST.
   - `ANIMUS_DEP_SCAN_INSTALL=1` для dependency scan.
 

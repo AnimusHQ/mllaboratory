@@ -13,17 +13,17 @@ export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const variantStyles: Record<ButtonVariant, string> = {
-  primary: 'bg-primary text-primary-foreground shadow-glow-sm hover:bg-primary/90',
-  default: 'bg-primary text-primary-foreground shadow-glow-sm hover:bg-primary/90',
-  secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/90',
-  ghost: 'bg-transparent text-foreground hover:bg-muted/40',
+  primary: 'bg-accent/80 text-accent-foreground hover:bg-accent/90 shadow-[0_0_25px_rgba(106,247,217,0.35)]',
+  default: 'bg-accent/80 text-accent-foreground hover:bg-accent/90 shadow-[0_0_25px_rgba(106,247,217,0.35)]',
+  secondary: 'border border-white/20 text-foreground hover:border-white/40 hover:bg-white/5',
+  ghost: 'bg-transparent text-foreground hover:bg-white/5',
   destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
 };
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-8 px-3 text-xs',
-  md: 'h-10 px-4 text-sm',
-  lg: 'h-12 px-5 text-base',
+  sm: 'px-3 py-1.5 text-xs',
+  md: 'px-4 py-2 text-sm',
+  lg: 'px-5 py-2.5 text-sm sm:text-base',
 };
 
 export function Button({ asChild, className, variant = 'primary', size = 'md', ...props }: ButtonProps) {
@@ -31,7 +31,7 @@ export function Button({ asChild, className, variant = 'primary', size = 'md', .
   return (
     <Comp
       className={cn(
-        'inline-flex items-center justify-center gap-2 rounded-md border border-border/70 font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/70 disabled:cursor-not-allowed disabled:opacity-50',
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 ring-offset-deep-space',
         variantStyles[variant],
         sizeStyles[size],
         className,

@@ -1,27 +1,18 @@
-# 09.10 Operational Runbooks
+# 09.10 Операционные runbook
 
-## 09.10.1 Scope
+## 09.10.1 Назначение
+Runbook фиксируют процедуры обнаружения, локализации и восстановления, что снижает риск несогласованных действий при инцидентах.
 
-Operational runbooks define required response procedures for platform reliability and security incidents. Each runbook must include detection, containment, recovery, and audit steps.
+## 09.10.2 Обязательные runbook
+- RB‑01: недоступен Control Plane → восстановление управления и аудита.
+- RB‑02: Run не стартует или остаётся `queued` → восстановление планирования.
+- RB‑03: деградация или недоступность Data Plane → восстановление исполнения.
+- RB‑04: сбой экспорта аудита или накопление DLQ → восстановление доказательной базы.
+- RB‑05: подозрение на компрометацию учётной записи → ограничение доступа и аудит.
+- RB‑06: инцидент утечки данных или модели → изоляция, аудит, восстановление.
+- RB‑07: потеря или повреждение метаданных → восстановление из бэкапа.
 
-## 09.10.2 Required runbooks
-
-RB-01: Control Plane unavailable.
-
-RB-02: Run does not start or remains in `queued`.
-
-RB-03: Data Plane unavailable or degraded.
-
-RB-04: Audit export failure or delivery backlog.
-
-RB-05: Suspected account compromise.
-
-RB-06: Data or Model leakage incident.
-
-RB-07: Control Plane metadata loss or corruption.
-
-## 09.10.3 Cross-references
-
-- Security escalation and audit requirements: [08-security-model.md](08-security-model.md)
-- Recovery and backup requirements: [09-operations-and-reliability.md](09-operations-and-reliability.md)
-- Acceptance criteria for operational readiness: [12-acceptance-criteria.md](12-acceptance-criteria.md)
+## 09.10.3 Ссылки
+- Безопасность и аудит: `docs/enterprise/08-security-model.md`
+- Надёжность и восстановление: `docs/enterprise/09-operations-and-reliability.md`
+- Критерии приёмки: `docs/enterprise/12-acceptance-criteria.md`

@@ -1,77 +1,49 @@
-# 14. Glossary
+# 14. Глоссарий
 
 ## Artifact
-
-A persisted output produced by a Run, including logs, metrics, files, and model binaries. Artifact is bound to a Run and scoped to a Project.
+Сохранённый результат Run (логи, метрики, файлы), что обеспечивает проверяемость и снижает риск потери результата.
 
 ## AuditEvent
-
-An append-only record of a significant action or state change, used for security and compliance. AuditEvent is immutable and exportable.
+Append‑only запись действия или изменения состояния, что обеспечивает доказательность и снижает риск ретроспективной правки.
 
 ## CodeRef
-
-A reference to source code, identified by repository URL and commit SHA. CodeRef is immutable and required for production-run.
+Ссылка на код (repo URL + commit SHA), что обеспечивает воспроизводимость и снижает риск неявной смены кода.
 
 ## Control Plane
-
-The management plane responsible for metadata, policy enforcement, orchestration, and audit. Control Plane never executes user code.
+Плоскость управления метаданными, политиками, оркестрацией и аудитом, что снижает риск неуправляемого исполнения.
 
 ## Data Plane
-
-The execution plane that runs user code in isolated environments and provides controlled access to data and Artifact.
+Плоскость исполнения пользовательского кода в изоляции, что снижает риск воздействия на управление.
 
 ## Dataset
-
-A registered logical collection of data within a Project.
+Логический контейнер данных в рамках проекта, что снижает риск смешения контекстов.
 
 ## DatasetVersion
+Неизменяемая версия данных с метаданными и lineage, что снижает риск подмены входов.
 
-An immutable version of a Dataset with explicit metadata, schema references, and lineage. DatasetVersion is required for Run inputs.
-
-## Developer Environment
-
-The controlled workspace for interactive ML development, including notebooks, terminals, and remote IDE access, governed by Control Plane policies.
+## Developer Environment (DevEnv)
+Управляемая IDE‑среда через proxy с TTL и аудитом, что снижает риск неконтролируемой интерактивной работы.
 
 ## EnvironmentDefinition
-
-A reusable description of a logical execution environment, including base image, dependencies, and resource characteristics.
+Логическое описание окружения исполнения, что снижает риск несогласованности шаблонов.
 
 ## EnvironmentLock
+Неизменяемый снимок окружения (digest/чеки), что снижает риск дрейфа зависимостей.
 
-An immutable, verifiable snapshot of an execution environment, including image digests and dependency checksums.
+## Model / ModelVersion
+Модель и её версия, привязанные к Run и артефактам, что снижает риск потери происхождения.
 
-## Model
+## Pipeline / PipelineRun
+DAG‑описание процесса и его исполнение, что снижает риск неявных зависимостей между шагами.
 
-A registered ML model within a Project, managed under explicit lifecycle and governance policies.
-
-## ModelVersion
-
-An immutable version of a Model linked to a source Run and Artifact.
-
-## Pipeline
-
-A directed acyclic graph of execution steps defined by a Pipeline Specification.
-
-## Pipeline Specification
-
-A declarative contract that defines pipeline steps, dependencies, resources, and error policies. It does not contain executable code.
-
-## PipelineRun
-
-An execution instance of a Pipeline, composed of multiple Run and governed by orchestration policy.
-
-## Production-run
-
-A Run executed under production governance constraints, including explicit CodeRef commit SHA and EnvironmentLock.
+## Production‑Run
+Run, прошедший все governance‑ограничения (`CodeRef`, `EnvironmentLock`, `PolicySnapshot`), что снижает риск недоказуемого результата.
 
 ## Project
-
-The primary isolation boundary and container for all domain entities in Animus Datalab.
+Основная граница изоляции для доменных сущностей, что снижает риск межпроектного доступа.
 
 ## Run
-
-A single execution of user code with explicit bindings to DatasetVersion, CodeRef, and EnvironmentLock.
+Единица исполнения с явными привязками контекста, что снижает риск невоспроизводимости.
 
 ## Service Account
-
-A non-human principal used for automation and CI/CD, subject to Project RBAC and audit.
+Сервисный аккаунт для автоматизации, подчинённый RBAC и аудиту, что снижает риск скрытых привилегий.

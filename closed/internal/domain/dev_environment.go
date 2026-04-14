@@ -44,10 +44,10 @@ type DevEnvironment struct {
 
 // DevEnvAccessSession is an immutable access session record for DevEnvironment.
 type DevEnvAccessSession struct {
-	SessionID   string    `json:"sessionId"`
-	ProjectID   string    `json:"projectId"`
-	DevEnvID    string    `json:"devEnvId"`
-	IssuedAt    time.Time `json:"issuedAt"`
-	ExpiresAt   time.Time `json:"expiresAt"`
-	IssuedBy    string    `json:"issuedBy,omitempty"`
+	SessionID string    `json:"sessionId"`
+	ProjectID string    `json:"projectId"`
+	DevEnvID  string    `json:"devEnvId"`
+	IssuedAt  time.Time `json:"issuedAt"`
+	ExpiresAt time.Time `json:"expiresAt"`
+	IssuedBy  string    `json:"issuedBy,omitempty"`
 }

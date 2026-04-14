@@ -116,13 +116,13 @@ function TopBar({ session }: { session: GatewaySession }) {
   }, [router, goMode]);
 
   return (
-    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-border/70 bg-card/40 px-6 py-4">
+    <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-[#0b1626]/85 px-6 py-4 backdrop-blur-[2px]">
       <div className="flex flex-1 flex-wrap items-center gap-3">
-        <div className="text-sm font-semibold tracking-[0.18em] uppercase">Animus Datalab</div>
+        <div className="text-sm font-semibold uppercase tracking-[0.18em] text-white">Animus Datalab</div>
         <Badge variant={session.mode === 'authenticated' ? 'info' : 'warning'}>
           {session.mode === 'authenticated' ? 'Сессия активна' : 'Требуется вход'}
         </Badge>
-        <div className="text-xs text-muted-foreground">Контур: Control Plane</div>
+        <div className="text-xs text-white/60">Контур: Control Plane</div>
       </div>
       <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
         <Input
@@ -139,7 +139,7 @@ function TopBar({ session }: { session: GatewaySession }) {
             className="h-8 w-40 text-xs"
           />
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs text-white/60">
           {session.mode === 'authenticated' ? session.subject : 'Не аутентифицирован'}
         </div>
         <Badge variant={effectiveRole === 'admin' ? 'success' : effectiveRole === 'editor' ? 'info' : 'neutral'}>
@@ -150,8 +150,8 @@ function TopBar({ session }: { session: GatewaySession }) {
             Быстрые действия
           </Button>
           {showQuick ? (
-            <div className="absolute right-0 mt-2 w-64 rounded-lg border border-border/70 bg-card p-3 shadow-glow-sm">
-              <div className="mb-2 text-xs uppercase tracking-[0.2em] text-muted-foreground">Запуск</div>
+            <div className="absolute right-0 mt-2 w-64 rounded-[20px] border border-white/12 bg-[#0b1626]/95 p-3 shadow-[0_18px_36px_rgba(3,10,18,0.6)] backdrop-blur-[2px]">
+              <div className="mb-2 text-[11px] uppercase tracking-[0.3em] text-white/60">Запуск</div>
               <div className="flex flex-col gap-2">
                 {quickActions.map((action) => {
                   const allowed = can(effectiveRole, action.capability);
@@ -160,13 +160,13 @@ function TopBar({ session }: { session: GatewaySession }) {
                       {allowed ? (
                         <Link
                           href={action.href}
-                          className="rounded-md border border-border/60 px-3 py-2 text-sm hover:bg-muted/40"
+                          className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
                           onClick={() => setShowQuick(false)}
                         >
                           {action.label}
                         </Link>
                       ) : (
-                        <div className="rounded-md border border-border/60 px-3 py-2 text-sm text-muted-foreground">
+                        <div className="rounded-xl border border-white/12 bg-white/5 px-3 py-2 text-sm text-white/40">
                           {action.label}
                         </div>
                       )}
@@ -195,7 +195,10 @@ function AuthRequired({ loginUrl }: { loginUrl: string }) {
             запрошенному разделу.
           </p>
           <div className="mt-6">
-            <Link href={loginUrl} className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+            <Link
+              href={loginUrl}
+              className="inline-flex items-center justify-center whitespace-nowrap rounded-xl bg-accent/80 px-4 py-2 text-sm font-medium text-accent-foreground transition-all hover:bg-accent/90"
+            >
               Войти
             </Link>
           </div>
@@ -230,15 +233,15 @@ export function AppShell({ session, children }: { session: GatewaySession; child
         <div className="min-h-screen bg-background text-foreground">
           <TopBar session={session} />
           <div className="grid min-h-[calc(100vh-72px)] grid-cols-[260px_1fr]">
-            <aside className="border-r border-border/70 bg-card/40 p-5">
+            <aside className="border-r border-white/10 bg-[#0b1626]/85 p-5">
               <div className="mb-6">
                 <div className="console-kicker">Навигация</div>
-                <div className="mt-2 text-sm text-muted-foreground">Контрольная плоскость</div>
+                <div className="mt-2 text-sm text-white/70">Контрольная плоскость</div>
               </div>
               <nav className="flex flex-col gap-6" aria-label="Основная навигация">
                 {navSections.map((section) => (
                   <div key={section.id} className="flex flex-col gap-2">
-                    <div className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{section.label}</div>
+                    <div className="text-[11px] uppercase tracking-[0.3em] text-white/60">{section.label}</div>
                     <div className="flex flex-col gap-1">
                       {section.items.map((item) => {
                         const active = isActive(item.href, pathname);
@@ -247,13 +250,13 @@ export function AppShell({ session, children }: { session: GatewaySession; child
                             key={item.href}
                             href={item.href}
                             className={cn(
-                              'rounded-md px-3 py-2 text-sm transition',
-                              active ? 'bg-muted/50 text-foreground' : 'text-muted-foreground hover:bg-muted/40',
+                              'rounded-xl px-3 py-2 text-sm transition',
+                              active ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5',
                             )}
                             aria-current={active ? 'page' : undefined}
                           >
                             <div className="font-semibold">{item.label}</div>
-                            {item.description ? <div className="text-xs text-muted-foreground">{item.description}</div> : null}
+                            {item.description ? <div className="text-xs text-white/50">{item.description}</div> : null}
                           </Link>
                         );
                       })}
@@ -264,12 +267,12 @@ export function AppShell({ session, children }: { session: GatewaySession; child
             </aside>
             <main className="px-8 py-6">
               {session.mode === 'error' ? (
-                <div className="mb-6 rounded-lg border border-rose-400/40 bg-card p-4 text-sm">
+                <div className="mb-6 rounded-[24px] border border-rose-400/40 bg-[#0b1626]/85 p-4 text-sm shadow-[0_18px_36px_rgba(3,10,18,0.6)]">
                   <div className="font-semibold text-rose-200">Сбой проверки сессии</div>
-                  <div className="mt-2 text-muted-foreground">
+                  <div className="mt-2 text-white/70">
                     Консоль не может подтвердить текущую сессию. Повторите запрос через несколько секунд.
                   </div>
-                  <div className="mt-2 text-xs text-muted-foreground">Код: {session.error}</div>
+                  <div className="mt-2 text-xs text-white/60">Код: {session.error}</div>
                 </div>
               ) : null}
               <div className="mb-4">

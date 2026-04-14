@@ -2,8 +2,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BASELINE_DIR="${ROOT_DIR}/open/api/baseline"
-CURRENT_DIR="${ROOT_DIR}/open/api/openapi"
+# shellcheck source=/dev/null
+source "${ROOT_DIR}/scripts/lib/paths.sh"
+
+CONTRACTS_DIR="$(animus_contracts_dir)"
+BASELINE_DIR="${CONTRACTS_DIR}/baseline"
+CURRENT_DIR="${CONTRACTS_DIR}/openapi"
 
 if [ "${OPENAPI_BASELINE_UPDATE:-}" = "1" ]; then
   mkdir -p "${BASELINE_DIR}"
@@ -13,8 +17,8 @@ if [ "${OPENAPI_BASELINE_UPDATE:-}" = "1" ]; then
 fi
 
 if [ "${OPENAPI_BREAKING_ALLOW:-}" = "1" ]; then
-  echo "openapi-compat: OPENAPI_BREAKING_ALLOW=1; skipping."
-  exit 0
+  echo "openapi-compat: OPENAPI_BREAKING_ALLOW is not supported"
+  exit 1
 fi
 
 if [ ! -d "${BASELINE_DIR}" ]; then

@@ -1,21 +1,15 @@
-# Security Policy
+# Политика безопасности
 
-## Reporting a vulnerability
+## Сообщение об уязвимостях
+Репозиторий содержит интеграционные артефакты (OpenAPI, SDK, демо‑клиенты, документацию) и не включает закрытые сервисы Control Plane и UI. Это разграничение снижает риск ошибочного маршрута для отчётов.
 
-This repository contains open integration artifacts (OpenAPI specs, SDKs, demo clients, and documentation). It does not include the closed-core control plane services or UI.
+- Для уязвимостей в закрытом контуре используйте приватный канал, принятый в вашем развёртывании, что снижает риск утечки деталей.
+- Для уязвимостей в SDK/демо‑клиентах используйте конфиденциальный тикетинг вашей организации, что снижает риск публичного раскрытия.
 
-For security issues in the closed core, use the private security reporting channel established for your deployment or engagement. There is no public disclosure mailbox defined in this repository.
+## Поддерживаемые версии
+Поддерживаемая версия — конкретный коммит или артефакт, развернутый в вашем окружении; фиксация версии снижает риск «плавающих» зависимостей.
 
-For security issues in the SDK or demo clients in this repo, report issues to the project maintainers through a confidential ticketing system in your organization.
+## Сводка модели угроз
+Базовая модель безопасности (Gateway‑only доступ, RBAC, run‑tokens, append‑only audit/lineage) реализована в закрытом контуре и описана в эксплуатационных документах, что снижает риск расхождения ожиданий.
 
-If you do not have a private channel, report issues to the project maintainers through a confidential ticketing system in your organization.
-
-## Supported versions
-
-The supported version is the specific commit or release artifact deployed in your environment. Pin a commit for production deployments and backport fixes as required by your change control process.
-
-## Threat model summary
-
-The Animus DataPilot core security model (gateway-only access, RBAC, run tokens, immutable audit/lineage) is implemented in the closed-core services and is documented in the deployment-specific materials.
-
-For integration guidance and evidence formats, see [open/02-security-and-compliance.md](open/02-security-and-compliance.md).
+См. `docs/open/02-security-and-compliance.md`.

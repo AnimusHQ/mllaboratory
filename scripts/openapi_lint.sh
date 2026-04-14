@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=/dev/null
 source "${ROOT_DIR}/scripts/go_env.sh"
+# shellcheck source=/dev/null
+source "${ROOT_DIR}/scripts/lib/paths.sh"
 
 if [[ -n "${GOFLAGS:-}" ]]; then
   export GOFLAGS="${GOFLAGS} -mod=vendor"
@@ -11,14 +13,15 @@ else
   export GOFLAGS="-mod=vendor"
 fi
 
+CONTRACTS_DIR="$(animus_contracts_dir)"
 SPECS=(
-  "${ROOT_DIR}/open/api/openapi/experiments.yaml"
-  "${ROOT_DIR}/open/api/openapi/dataplane_internal.yaml"
-  "${ROOT_DIR}/open/api/openapi/dataset-registry.yaml"
-  "${ROOT_DIR}/open/api/openapi/quality.yaml"
-  "${ROOT_DIR}/open/api/openapi/lineage.yaml"
-  "${ROOT_DIR}/open/api/openapi/audit.yaml"
-  "${ROOT_DIR}/open/api/openapi/gateway.yaml"
+  "${CONTRACTS_DIR}/openapi/experiments.yaml"
+  "${CONTRACTS_DIR}/openapi/dataplane_internal.yaml"
+  "${CONTRACTS_DIR}/openapi/dataset-registry.yaml"
+  "${CONTRACTS_DIR}/openapi/quality.yaml"
+  "${CONTRACTS_DIR}/openapi/lineage.yaml"
+  "${CONTRACTS_DIR}/openapi/audit.yaml"
+  "${CONTRACTS_DIR}/openapi/gateway.yaml"
 )
 
 for spec in "${SPECS[@]}"; do

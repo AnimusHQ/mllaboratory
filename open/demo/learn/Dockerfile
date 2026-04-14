@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-COPY open/sdk/python /app/sdk/python
+COPY sdk/python /app/sdk/python
 RUN pip install --no-cache-dir numpy pillow /app/sdk/python
 
 COPY open/demo/learn /app/learn

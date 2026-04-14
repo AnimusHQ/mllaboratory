@@ -39,14 +39,14 @@ export function PipelineGraph({
 
   if (nodes.length === 0) {
     return (
-      <div className="rounded-md border border-border/60 px-4 py-6 text-sm text-muted-foreground">
+      <div className="rounded-[24px] border border-white/12 bg-[#0b1626]/85 px-4 py-6 text-sm text-white/70 shadow-[0_18px_36px_rgba(3,10,18,0.6)]">
         Структура pipelineSpec не содержит явных шагов. Отображается только JSON‑представление.
       </div>
     );
   }
 
   return (
-    <div className="overflow-auto rounded-lg border border-border/70">
+    <div className="overflow-auto rounded-[24px] border border-white/12 bg-[#0b1626]/90 shadow-[0_18px_36px_rgba(3,10,18,0.6)]">
       <table className="console-table">
         <thead>
           <tr>
@@ -60,7 +60,7 @@ export function PipelineGraph({
           {nodes.map((node) => (
             <tr key={node.id}>
               <td className="font-mono text-xs">{node.name}</td>
-              <td className="text-xs text-muted-foreground">
+              <td className="text-xs text-white/60">
                 {node.deps.length ? node.deps.join(', ') : '—'}
               </td>
               <td className="text-xs">{attemptsByStep?.[node.id] ?? 0}</td>

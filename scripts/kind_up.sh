@@ -2,7 +2,10 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=/dev/null
+source "${ROOT_DIR}/scripts/lib/paths.sh"
 CACHE_DIR="${ROOT_DIR}/.cache"
+DEPLOY_DIR="$(animus_deploy_dir)"
 
 if [[ "${ANIMUS_SYSTEM_ENABLE:-}" != "1" ]]; then
   echo "system-up: ANIMUS_SYSTEM_ENABLE not set; skipping."
@@ -93,7 +96,7 @@ DATAPILOT_ARGS="$(helm_image_args "$DATAPILOT_IMAGE")"
 DATAPLANE_ARGS="$(helm_image_args "$DATAPLANE_IMAGE")"
 
 # shellcheck disable=SC2086
-helm upgrade --install "$DATAPILOT_RELEASE" "$ROOT_DIR/closed/deploy/helm/animus-datapilot" \
+helm upgrade --install "$DATAPILOT_RELEASE" "${DEPLOY_DIR}/helm/animus-datapilot" \
   --namespace "$NAMESPACE" \
   --create-namespace \
   -f "$ROOT_DIR/scripts/system_values.yaml" \
@@ -101,7 +104,7 @@ helm upgrade --install "$DATAPILOT_RELEASE" "$ROOT_DIR/closed/deploy/helm/animus
   $DATAPILOT_ARGS
 
 # shellcheck disable=SC2086
-helm upgrade --install "$DATAPLANE_RELEASE" "$ROOT_DIR/closed/deploy/helm/animus-dataplane" \
+helm upgrade --install "$DATAPLANE_RELEASE" "${DEPLOY_DIR}/helm/animus-dataplane" \
   --namespace "$NAMESPACE" \
   --create-namespace \
   -f "$ROOT_DIR/scripts/system_dataplane_values.yaml" \

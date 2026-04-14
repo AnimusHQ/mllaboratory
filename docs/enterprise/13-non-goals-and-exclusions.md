@@ -1,9 +1,8 @@
-# 13. Non-Goals and Explicit Exclusions
+# 13. Не‑цели и исключения
 
-The following items are explicitly out of scope for Animus Datalab:
+Следующие элементы сознательно исключены, что снижает риск размывания границ системы:
+- встроенный Git‑хостинг или замена IDE;
+- полноценная платформа инференса (экспорт в внешние контуры допускается);
+- отдельный продукт Feature Store (интеграции возможны).
 
-- Built-in Git hosting or full IDE replacement.
-- A full inference platform (export to external systems is supported).
-- A standalone Feature Store product (interfaces may be integrated).
-
-These exclusions are architectural boundaries and must not be treated as temporary gaps.
+Исключения являются архитектурными границами и не трактуются как временные пробелы.
