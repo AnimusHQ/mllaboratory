@@ -180,6 +180,94 @@ The repository’s production deployment model is not a single monolith. It is a
 * **Project scoping is the default business boundary** for datasets, runs, artifacts, and permissions.
 * **Operational truth is DB-first**: central state is persisted and reconciled explicitly rather than inferred from workload state alone.
 
+### Project life-cycle in k8
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant Dev as Developer / CI-CD
+  participant Helm as Helm / kubectl
+  participant API as kube-apiserver
+  participant ETCD as etcd
+  participant Ctrl as Controllers
+  participant Sch as kube-scheduler
+  participant Kubelet as kubelet (target node)
+  participant Runtime as Container Runtime
+  participant CNI as CNI Plugin
+  participant CSI as CSI Driver
+  participant Pod as Application Pod
+  participant EP as EndpointSlice / Service
+  participant User as Client Traffic
+
+  Dev->>Helm: helm upgrade --install / kubectl apply
+  Helm->>API: Submit desired state (Deployment, Service, ConfigMap, Secret, PVC, ...)
+  API->>ETCD: Persist declarative objects
+
+  Ctrl->>API: Watch desired state
+  Ctrl->>API: Create / update ReplicaSet
+  Ctrl->>API: Create Pod objects
+
+  Sch->>API: Watch unscheduled Pods
+  Sch->>API: Bind Pod to target node
+
+  Kubelet->>API: Watch Pods assigned to node
+  Kubelet->>Runtime: Pull image and create Pod sandbox
+  Runtime-->>Kubelet: Sandbox ready
+
+  Kubelet->>CSI: Attach / mount volumes (if PVC present)
+  CSI-->>Kubelet: Volumes mounted
+
+  Kubelet->>CNI: Configure Pod network
+  CNI-->>Kubelet: Pod IP and networking ready
+
+  Kubelet->>Runtime: Start init containers
+  Runtime-->>Kubelet: Init phase complete
+
+  Kubelet->>Runtime: Start application container(s)
+  Runtime-->>Pod: Process started
+
+  Kubelet->>Pod: Run startup probe
+  Pod-->>Kubelet: Startup succeeded
+
+  Kubelet->>Pod: Run liveness probe
+  Pod-->>Kubelet: Container alive
+
+  Kubelet->>Pod: Run readiness probe
+  Pod-->>Kubelet: Ready to serve traffic
+
+  API->>EP: Update EndpointSlice / Service endpoints
+  EP-->>User: Pod becomes routable through Service
+
+  User->>EP: Send traffic
+  EP->>Pod: Route requests
+
+  rect rgb(245,245,245)
+    note over API,Pod: Steady state / reconciliation
+    Ctrl->>API: Ensure desired replicas
+    Kubelet->>Pod: Continue probes
+    Kubelet->>API: Report Pod status
+  end
+
+  alt Deployment update / rollout
+    Dev->>Helm: Apply new chart / manifest version
+    Helm->>API: Update Deployment spec
+    Ctrl->>API: Create new ReplicaSet
+    Sch->>API: Schedule new Pods
+    Kubelet->>Runtime: Start new Pods
+    Kubelet->>Pod: Probes pass
+    API->>EP: Shift traffic to new Pods
+    Ctrl->>API: Scale down old ReplicaSet
+  end
+
+  alt Pod termination / rollout / eviction
+    API->>Kubelet: Pod deletion / termination request
+    Kubelet->>Pod: SIGTERM
+    Pod-->>Kubelet: Graceful shutdown
+    Kubelet->>Runtime: Stop containers
+    API->>EP: Remove Pod from endpoints
+  end
+```
+
 ### Production service composition
 
 #### Control Plane — Animus DataPilot
