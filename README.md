@@ -1,5 +1,3 @@
-# Animus Datalab
-
 ![Animus Datalab](docs/assets/animus-banner.png)
 
 > **Enterprise digital laboratory for machine learning** that organizes the full ML development lifecycle in a managed, reproducible form within a single operational context with common execution, security, and audit rules.
