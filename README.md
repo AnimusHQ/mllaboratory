@@ -1,6 +1,6 @@
 ![Animus Datalab](animus-banner.png)
 
-> **Enterprise digital laboratory for machine learning** that organizes the full ML development lifecycle in a managed, reproducible form within a single operational context with common execution, security, and audit rules.
+> **Enterprise digital laboratory for machine learning** that organizes the full ML development lifecycle in a managed, reproducible form within a single operational context with common execution, security, and audit rules
 
 **Primary language:** Go (services)
 **Data / policy layer:** PostgreSQL migrations (SQL/PLpgSQL)
