@@ -1,0 +1,6632 @@
+openapi: 3.0.3
+info:
+  title: Animus Experiments API
+  version: 0.3.0
+  description: |
+    Experiment registry, immutable run records, and CI integrations.
+
+    In most deployments this service is accessed through the gateway (which enforces auth/RBAC).
+servers:
+  - url: http://localhost:8083
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /experiments:
+    get:
+      summary: List experiments
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of experiments to return.
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional exact name filter.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create an experiment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExperimentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Experiment name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiments/{experiment_id}:
+    get:
+      summary: Get experiment by ID
+      parameters:
+        - name: experiment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Experiment"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiments/{experiment_id}/runs:
+    get:
+      summary: List experiment runs
+      parameters:
+        - name: experiment_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of runs to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create an experiment run
+      description: |
+        Creates an immutable experiment run record.
+
+        If `dataset_version_id` is provided, the run creation is blocked unless the referenced dataset version
+        has a `quality_rule_id` and the latest evaluation for that rule/version is `pass`.
+      parameters:
+        - name: experiment_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExperimentRunRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRun"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Quality gate failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiments/runs:execute:
+    post:
+      summary: Create a training run execution intent
+      description: |
+        Legacy compatibility endpoint.
+        Creates an immutable experiment run record in `pending` state and records execution intent.
+        Control Plane does not execute user workloads directly; execution is Data Plane-only.
+        Use `/projects/{project_id}/runs/{run_id}:dispatch` for canonical Data Plane execution dispatch.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExecuteExperimentRunRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteExperimentRunResponse"
+        "202":
+          description: Approval required
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecuteExperimentRunPendingApprovalResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden (policy denied)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Experiment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Quality gate failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "501":
+          description: Control-plane execution disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs:
+    get:
+      summary: List experiment runs (all experiments)
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of runs to return.
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, running, succeeded, failed, canceled]
+          description: Optional exact status filter.
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: If true, returns only runs in pending/running state.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}:
+    get:
+      summary: Get run by ID
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRun"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/execution:
+    get:
+      summary: Get run execution record
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunExecution"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/build-context:
+    get:
+      summary: Get run build context
+      description: |
+        Returns the immutable image digest for the run execution and, if available, the associated CI build metadata from the model image registry.
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunBuildContext"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /execution-ledger:
+    get:
+      summary: Export execution ledger entries
+      parameters:
+        - name: run_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional run ID filter.
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Optional RFC3339 start timestamp filter.
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+          description: Optional RFC3339 end timestamp filter.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of ledger entries to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionLedgerExportResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /execution-ledger/{run_id}:
+    get:
+      summary: Get execution ledger entry by run
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionLedgerExportResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/metrics:
+    get:
+      summary: List run metric samples
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional metric name filter.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: Max number of samples to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunMetricsResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Ingest run metrics (append-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IngestExperimentRunMetricsRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestExperimentRunMetricsResponse"
+        "200":
+          description: Duplicate (idempotent retry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestExperimentRunMetricsResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/artifacts:
+    get:
+      summary: List run artifacts
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: kind
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [model, preview, log, file]
+          description: Optional artifact kind filter.
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of artifacts to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunArtifactListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Upload run artifact (append-only)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [kind, file]
+              properties:
+                kind:
+                  type: string
+                  enum: [model, preview, log, file]
+                name:
+                  type: string
+                metadata:
+                  type: string
+                  description: JSON-encoded object string.
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateExperimentRunArtifactResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Artifact store failure
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/artifacts/{artifact_id}:
+    get:
+      summary: Get run artifact by ID
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunArtifact"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/artifacts/{artifact_id}/download:
+    get:
+      summary: Download run artifact
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: artifact_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Artifact bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/evidence-bundles:
+    get:
+      summary: List evidence bundles for a run
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of bundles to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceBundleListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create evidence bundle for a run
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CreateEvidenceBundleResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Object store error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/evidence-bundles/{bundle_id}:
+    get:
+      summary: Get evidence bundle metadata
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bundle_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvidenceBundle"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/evidence-bundles/{bundle_id}/download:
+    get:
+      summary: Download evidence bundle
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bundle_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Evidence bundle zip
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Object store error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/evidence-bundles/{bundle_id}/report:
+    get:
+      summary: Download evidence bundle report
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: bundle_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Evidence bundle PDF report
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Object store error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/stream:
+    get:
+      summary: Stream run telemetry (SSE)
+      description: |
+        Streams run status changes, metric samples, and run timeline events as Server-Sent Events (SSE).
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: after_event_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Optional resume cursor for run events.
+      responses:
+        "200":
+          description: SSE stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /experiment-runs/{run_id}/events:
+    get:
+      summary: List run events
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+          description: Max number of events to return.
+        - name: before_event_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 0
+          description: Optional pagination cursor.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunEventListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create run event (append-only)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateExperimentRunEventRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperimentRunEvent"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /ci/webhook:
+    post:
+      summary: Attach CI context to a run (signed)
+      description: |
+        Signed webhook for attaching CI/build metadata to an existing run.
+
+        Signature scheme:
+        - `body_sha256_hex = sha256(body_bytes)`
+        - `message = ts + "\\n" + upper(method) + "\\n" + body_sha256_hex`
+        - `signature = base64url(hmac_sha256(ANIMUS_CI_WEBHOOK_SECRET, message))` (no padding)
+      parameters:
+        - name: X-Animus-CI-Ts
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Unix timestamp (seconds).
+        - name: X-Animus-CI-Sig
+          in: header
+          required: true
+          schema:
+            type: string
+          description: base64url(HMAC-SHA256) signature (no padding).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CIWebhookRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CIWebhookResponse"
+        "200":
+          description: Duplicate (idempotent retry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CIWebhookResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Signature missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Run not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /ci/report:
+    post:
+      summary: Report model image build metadata (signed)
+      description: |
+        Signed webhook for registering model training images built by CI/CD.
+
+        Signature scheme:
+        - `body_sha256_hex = sha256(body_bytes)`
+        - `message = ts + "\\n" + upper(method) + "\\n" + body_sha256_hex`
+        - `signature = base64url(hmac_sha256(ANIMUS_CI_WEBHOOK_SECRET, message))` (no padding)
+      parameters:
+        - name: X-Animus-CI-Ts
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Unix timestamp (seconds).
+        - name: X-Animus-CI-Sig
+          in: header
+          required: true
+          schema:
+            type: string
+          description: base64url(HMAC-SHA256) signature (no padding).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CIReportRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CIReportResponse"
+        "200":
+          description: Duplicate (idempotent retry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CIReportResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Signature missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /gitlab/webhook:
+    post:
+      summary: Ingest GitLab governance webhook
+      description: |
+        Accepts GitLab pipeline or merge request webhooks with governance signals.
+        The shared secret is validated via the `X-Gitlab-Token` header.
+      parameters:
+        - name: X-Gitlab-Token
+          in: header
+          required: true
+          schema:
+            type: string
+          description: Shared secret token configured in GitLab webhook settings.
+        - name: X-Gitlab-Event
+          in: header
+          required: false
+          schema:
+            type: string
+          description: GitLab event type (e.g., `Pipeline Hook`, `Merge Request Hook`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitlabWebhookPayload"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitlabWebhookResponse"
+        "200":
+          description: Duplicate (idempotent retry)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitlabWebhookResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Token missing or invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /model-images:
+    get:
+      summary: List model images
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of model images to return.
+        - name: repo
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional exact repo filter.
+        - name: commit_sha
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional exact commit SHA filter.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelImageListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /model-images/{image_digest}:
+    get:
+      summary: Get model image by digest
+      parameters:
+        - name: image_digest
+          in: path
+          required: true
+          schema:
+            type: string
+          description: sha256 digest (e.g. `sha256:...`).
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelImage"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policies:
+    get:
+      summary: List policies
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+          description: Max number of policies to return.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePolicyRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyVersion"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Policy name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policies/{policy_id}:
+    get:
+      summary: Get policy by ID
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicySummary"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policies/{policy_id}/versions:
+    get:
+      summary: List policy versions
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyVersionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create policy version
+      parameters:
+        - name: policy_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreatePolicyVersionRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyVersion"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-decisions:
+    get:
+      summary: List policy decisions
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: run_id
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional experiment run filter.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyDecisionListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-decisions/{decision_id}:
+    get:
+      summary: Get policy decision
+      parameters:
+        - name: decision_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyDecisionDetail"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-approvals:
+    get:
+      summary: List policy approvals
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pending, approved, denied]
+        - name: run_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyApprovalListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-approvals/{approval_id}:
+    get:
+      summary: Get policy approval
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyApprovalDetail"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-approvals/{approval_id}/approve:
+    post:
+      summary: Approve a policy decision
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyApprovalActionRequest"
+      responses:
+        "200":
+          description: Approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyApprovalActionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /policy-approvals/{approval_id}/deny:
+    post:
+      summary: Deny a policy decision
+      parameters:
+        - name: approval_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PolicyApprovalActionRequest"
+      responses:
+        "200":
+          description: Denied
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicyApprovalActionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Создать RunSpec (контрольная плоскость)
+      description: |
+        Создаёт неизменяемый RunSpec для детерминированного планирования.
+        Для операций Create поддерживается идемпотентность по заголовку `Idempotency-Key`.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectRunCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunCreateResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить RunSpec и состояние
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunGetResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}:dispatch:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Диспетчеризировать Run в Data Plane
+      description: |
+        Запускает выполнение Run через Data Plane. Операция идемпотентна по `Idempotency-Key`
+        (если заголовок отсутствует, используется `run_id`).
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProjectRunDispatchRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunDispatchResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}:plan:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Построить детерминированный план Run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunPlanSummary"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Plan conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: Получить план Run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExecutionPlan"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}:dry-run:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Выполнить dry‑run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunDryRunResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: Получить результаты dry‑run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunDryRunExecutionsResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}/reproducibility-bundle:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Экспорт входов Run (reproducibility bundle)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectRunReproducibilityBundle"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/runs/{run_id}/policy-snapshot:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: run_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить PolicySnapshot для Run
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PolicySnapshot"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/role-bindings:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: List project role bindings
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleBindingListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create or update a role binding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RoleBindingRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RoleBindingResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/role-bindings/{binding_id}:delete:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: binding_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Delete a role binding
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список EnvironmentDefinition
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать EnvironmentDefinition
+      description: |
+        Создаёт новую версию окружения в рамках проекта.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить EnvironmentDefinition
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinition"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:update:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Создать новую версию EnvironmentDefinition
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-definitions/{definition_id}:archive:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: definition_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Архивировать EnvironmentDefinition (новая версия)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentDefinitionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentDefinitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-locks:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список EnvironmentLock
+      parameters:
+        - name: environment_definition_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLockListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать EnvironmentLock
+      description: |
+        Формирует неизменяемую фиксацию окружения по EnvironmentDefinition.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnvironmentLockCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLockResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Registry verification failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/registry/verifications:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список проверок целостности образов
+      parameters:
+        - name: image_digest_ref
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImageVerificationListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/subscriptions:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Создать webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionCreateRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    get:
+      summary: Список webhook-подписок
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/subscriptions/{subscription_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: subscription_id
+        in: path
+        required: true
+        schema:
+          type: string
+    patch:
+      summary: Обновить webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      summary: Обновить webhook-подписку
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookSubscriptionUpdateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookSubscriptionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список доставок webhook
+      parameters:
+        - name: event_type
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WebhookEventType"
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/WebhookDeliveryStatus"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries/{delivery_id}/attempts:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Попытки доставки webhook
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryAttemptListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/webhooks/deliveries/{delivery_id}:replay:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: delivery_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Повторить доставку webhook
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookDeliveryReplayRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryReplayResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/environment-locks/{lock_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: lock_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить EnvironmentLock
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnvironmentLock"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/models:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список моделей
+      parameters:
+        - name: name
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Точное имя модели (опционально).
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать модель
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelCreateResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/models/{model_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить модель
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Model"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/models/{model_id}/versions:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список версий модели
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать версию модели
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelVersionCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionCreateResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить версию модели
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersion"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}/provenance:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить provenance версии модели
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionProvenanceResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}:validate:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Валидация версии модели
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionTransitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}:approve:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Аппрув версии модели
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionTransitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}:deprecate:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Депрекейт версии модели
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelVersionTransitionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Invalid transition
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/model-versions/{model_version_id}:export:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: model_version_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Экспорт версии модели
+      description: Экспорт доступен только для утверждённой версии и при выполнении policy‑решений (deny‑by‑default).
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ModelExportRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModelExportResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/dev-environments:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список DevEnvironment
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/DevEnvironmentState"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать DevEnvironment
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/dev-environments/{dev_env_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить DevEnvironment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironment"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/dev-environments/{dev_env_id}:access:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Запросить доступ к DevEnvironment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentAccessRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentAccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/dev-environments/{dev_env_id}:stop:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Остановить DevEnvironment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Список DevEnvironment (short path)
+      parameters:
+        - name: state
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/DevEnvironmentState"
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Создать DevEnvironment (short path)
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentCreateRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Idempotency conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Получить DevEnvironment (short path)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironment"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:open-ide-session:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Открыть IDE-сессию DevEnvironment
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvironmentAccessRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentAccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /projects/{project_id}/devenvs/{dev_env_id}:stop:
+    parameters:
+      - name: project_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: dev_env_id
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      summary: Остановить DevEnvironment (short path)
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvironmentResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /devenv-sessions/{session_id}/proxy/{path}:
+    parameters:
+      - name: session_id
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: path
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      summary: Прокси-доступ к IDE DevEnvironment
+      responses:
+        "200":
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status]
+      properties:
+        service:
+          type: string
+        status:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, request_id]
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    Experiment:
+      type: object
+      additionalProperties: false
+      required: [experiment_id, name, metadata, created_at, created_by]
+      properties:
+        experiment_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExperimentListResponse:
+      type: object
+      additionalProperties: false
+      required: [experiments]
+      properties:
+        experiments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Experiment"
+    CreateExperimentRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        metadata:
+          type: object
+    ExperimentRun:
+      type: object
+      additionalProperties: false
+      required: [run_id, experiment_id, status, started_at, params, metrics]
+      properties:
+        run_id:
+          type: string
+        experiment_id:
+          type: string
+        dataset_version_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, canceled]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        git_repo:
+          type: string
+        git_commit:
+          type: string
+        git_ref:
+          type: string
+        params:
+          type: object
+        metrics:
+          type: object
+        artifacts_prefix:
+          type: string
+    ExperimentRunListResponse:
+      type: object
+      additionalProperties: false
+      required: [runs]
+      properties:
+        runs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentRun"
+    ExperimentRunArtifact:
+      type: object
+      additionalProperties: false
+      required: [artifact_id, run_id, kind, object_key, sha256, size_bytes, metadata, created_at, created_by]
+      properties:
+        artifact_id:
+          type: string
+        run_id:
+          type: string
+        kind:
+          type: string
+          enum: [model, preview, log, file]
+        name:
+          type: string
+        filename:
+          type: string
+        content_type:
+          type: string
+        object_key:
+          type: string
+        sha256:
+          type: string
+        size_bytes:
+          type: integer
+        metadata:
+          type: object
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExperimentRunArtifactListResponse:
+      type: object
+      additionalProperties: false
+      required: [artifacts]
+      properties:
+        artifacts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentRunArtifact"
+    CreateExperimentRunArtifactResponse:
+      type: object
+      additionalProperties: false
+      required: [artifact]
+      properties:
+        artifact:
+          $ref: "#/components/schemas/ExperimentRunArtifact"
+    EvidenceBundle:
+      type: object
+      additionalProperties: false
+      required:
+        [
+          bundle_id,
+          run_id,
+          bundle_object_key,
+          report_object_key,
+          bundle_sha256,
+          bundle_size_bytes,
+          report_sha256,
+          report_size_bytes,
+          signature,
+          signature_alg,
+          created_at,
+          created_by
+        ]
+      properties:
+        bundle_id:
+          type: string
+        run_id:
+          type: string
+        bundle_object_key:
+          type: string
+        report_object_key:
+          type: string
+        bundle_sha256:
+          type: string
+        bundle_size_bytes:
+          type: integer
+          format: int64
+        report_sha256:
+          type: string
+        report_size_bytes:
+          type: integer
+          format: int64
+        signature:
+          type: string
+        signature_alg:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    EvidenceBundleListResponse:
+      type: object
+      additionalProperties: false
+      required: [bundles]
+      properties:
+        bundles:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceBundle"
+    CreateEvidenceBundleResponse:
+      type: object
+      additionalProperties: false
+      required: [bundle]
+      properties:
+        bundle:
+          $ref: "#/components/schemas/EvidenceBundle"
+    CreateExperimentRunRequest:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        dataset_version_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, succeeded, failed, canceled]
+        started_at:
+          type: string
+          format: date-time
+        ended_at:
+          type: string
+          format: date-time
+        git_repo:
+          type: string
+        git_commit:
+          type: string
+        git_ref:
+          type: string
+        params:
+          type: object
+        metrics:
+          type: object
+        artifacts_prefix:
+          type: string
+    ExecuteExperimentRunRequest:
+      type: object
+      additionalProperties: false
+      required: [experiment_id, dataset_version_id, image_ref]
+      properties:
+        experiment_id:
+          type: string
+        dataset_version_id:
+          type: string
+        image_ref:
+          type: string
+          description: |
+            Training image reference.
+
+            - Kubernetes executor: must be digest-pinned (e.g. `repo/image@sha256:...`).
+            - Docker executor: may be digest-pinned or a local image tag (tags are resolved to an immutable image ID digest and stored in `image_digest`).
+        git_repo:
+          type: string
+          description: Optional Git repository URL/name. If omitted, the service may derive it from the model image registry.
+        git_commit:
+          type: string
+          description: Git commit SHA. Required unless the referenced `image_ref` digest exists in the model image registry.
+        git_ref:
+          type: string
+          description: Optional Git ref (branch/tag) associated with the commit.
+        params:
+          type: object
+        resources:
+          type: object
+          additionalProperties: true
+          description: Optional executor-specific resource hints (e.g. `gpus`, `cpu`, `memory`).
+    ExecuteExperimentRunResponse:
+      type: object
+      additionalProperties: false
+      required: [run_id, execution_id, status, datapilot_url]
+      properties:
+        run_id:
+          type: string
+        execution_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, running]
+        datapilot_url:
+          type: string
+    ExecuteExperimentRunPendingApprovalResponse:
+      type: object
+      additionalProperties: false
+      required: [run_id, status, approval_required, approval_ids]
+      properties:
+        run_id:
+          type: string
+        status:
+          type: string
+          enum: [pending]
+        approval_required:
+          type: boolean
+        approval_ids:
+          type: array
+          items:
+            type: string
+    ExperimentRunExecution:
+      type: object
+      additionalProperties: false
+      required: [execution_id, run_id, executor, image_ref, resources, datapilot_url, created_at, created_by]
+      properties:
+        execution_id:
+          type: string
+        run_id:
+          type: string
+        executor:
+          type: string
+        image_ref:
+          type: string
+        image_digest:
+          type: string
+        resources:
+          type: object
+          additionalProperties: true
+        k8s_namespace:
+          type: string
+        k8s_job_name:
+          type: string
+        docker_container_id:
+          type: string
+        datapilot_url:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExperimentRunBuildContext:
+      type: object
+      additionalProperties: false
+      required: [run_id, image_ref]
+      properties:
+        run_id:
+          type: string
+        image_ref:
+          type: string
+        image_digest:
+          type: string
+        repo:
+          type: string
+        commit_sha:
+          type: string
+        pipeline_id:
+          type: string
+        provider:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+    ExecutionLedgerPolicyDecision:
+      type: object
+      additionalProperties: false
+      required: [decision_id, policy_id, policy_version_id, policy_sha256, context_sha256, decision, created_at, created_by]
+      properties:
+        decision_id:
+          type: string
+        policy_id:
+          type: string
+        policy_version_id:
+          type: string
+        policy_sha256:
+          type: string
+        context_sha256:
+          type: string
+        decision:
+          type: string
+        rule_id:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExecutionLedgerPolicyApproval:
+      type: object
+      additionalProperties: false
+      required: [approval_id, decision_id, status, requested_at, requested_by]
+      properties:
+        approval_id:
+          type: string
+        decision_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, denied]
+        requested_at:
+          type: string
+          format: date-time
+        requested_by:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: string
+        reason:
+          type: string
+    ExecutionLedgerEntry:
+      type: object
+      additionalProperties: false
+      required: [schema, ledger_id, run_id, execution_id, experiment_id, dataset, image, executor, params, resources, policy, created_at, created_by]
+      properties:
+        schema:
+          type: string
+        ledger_id:
+          type: string
+        run_id:
+          type: string
+        execution_id:
+          type: string
+        experiment_id:
+          type: string
+        dataset:
+          type: object
+          additionalProperties: false
+          required: [dataset_id, version_id, sha256]
+          properties:
+            dataset_id:
+              type: string
+            version_id:
+              type: string
+            sha256:
+              type: string
+        git:
+          type: object
+          additionalProperties: false
+          properties:
+            repo:
+              type: string
+            commit:
+              type: string
+            ref:
+              type: string
+        image:
+          type: object
+          additionalProperties: false
+          required: [ref, digest]
+          properties:
+            ref:
+              type: string
+            digest:
+              type: string
+        executor:
+          type: object
+          additionalProperties: false
+          required: [kind, datapilot_url]
+          properties:
+            kind:
+              type: string
+            k8s_namespace:
+              type: string
+            k8s_job_name:
+              type: string
+            docker_container_id:
+              type: string
+            datapilot_url:
+              type: string
+        params:
+          type: object
+          additionalProperties: true
+        resources:
+          type: object
+          additionalProperties: true
+        policy:
+          type: object
+          additionalProperties: false
+          required: [decisions]
+          properties:
+            decisions:
+              type: array
+              items:
+                $ref: "#/components/schemas/ExecutionLedgerPolicyDecision"
+            approvals:
+              type: array
+              items:
+                $ref: "#/components/schemas/ExecutionLedgerPolicyApproval"
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExecutionReplayBundle:
+      type: object
+      additionalProperties: false
+      required: [schema, run_id, experiment_id, dataset_id, dataset_version_id, dataset_sha256, image_ref, image_digest, executor, resources, params]
+      properties:
+        schema:
+          type: string
+        run_id:
+          type: string
+        experiment_id:
+          type: string
+        dataset_id:
+          type: string
+        dataset_version_id:
+          type: string
+        dataset_sha256:
+          type: string
+        git_repo:
+          type: string
+        git_commit:
+          type: string
+        git_ref:
+          type: string
+        image_ref:
+          type: string
+        image_digest:
+          type: string
+        executor:
+          type: string
+        resources:
+          type: object
+          additionalProperties: true
+        params:
+          type: object
+          additionalProperties: true
+    ExecutionLedgerRecord:
+      type: object
+      additionalProperties: false
+      required: [ledger_id, run_id, execution_id, execution_hash, entry, entry_sha256, replay_bundle, created_at, created_by]
+      properties:
+        ledger_id:
+          type: string
+        run_id:
+          type: string
+        execution_id:
+          type: string
+        execution_hash:
+          type: string
+        entry:
+          $ref: "#/components/schemas/ExecutionLedgerEntry"
+        entry_sha256:
+          type: string
+        replay_bundle:
+          $ref: "#/components/schemas/ExecutionReplayBundle"
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    ExecutionLedgerExportResponse:
+      type: object
+      additionalProperties: false
+      required: [entries, checksum]
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExecutionLedgerRecord"
+        checksum:
+          type: string
+    CIReportRequest:
+      type: object
+      additionalProperties: true
+      required: [image_digest, repo, commit_sha, pipeline_id]
+      properties:
+        image_digest:
+          type: string
+          description: sha256 digest (e.g. `sha256:...`).
+        repo:
+          type: string
+        commit_sha:
+          type: string
+        pipeline_id:
+          type: string
+        provider:
+          type: string
+    CIReportResponse:
+      type: object
+      additionalProperties: true
+      required: [status, image_digest, payload_sha256]
+      properties:
+        status:
+          type: string
+          enum: [created, duplicate]
+        image_digest:
+          type: string
+        repo:
+          type: string
+        commit_sha:
+          type: string
+        pipeline_id:
+          type: string
+        provider:
+          type: string
+        payload_sha256:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        received_by:
+          type: string
+    GitlabWebhookPayload:
+      type: object
+      additionalProperties: true
+    GitlabGovernanceRecord:
+      type: object
+      additionalProperties: false
+      required: [governance_id, repo, commit_sha, event_type, received_at, received_by, payload_sha256, signature]
+      properties:
+        governance_id:
+          type: string
+        repo:
+          type: string
+        commit_sha:
+          type: string
+        ref:
+          type: string
+        ref_protected:
+          type: boolean
+        project_id:
+          type: integer
+          format: int64
+        project_path:
+          type: string
+        pipeline_id:
+          type: integer
+          format: int64
+        pipeline_url:
+          type: string
+        pipeline_status:
+          type: string
+        pipeline_source:
+          type: string
+        merge_request_id:
+          type: integer
+          format: int64
+        merge_request_iid:
+          type: integer
+          format: int64
+        merge_request_url:
+          type: string
+        merge_request_source_branch:
+          type: string
+        merge_request_target_branch:
+          type: string
+        approvals_required:
+          type: integer
+        approvals_received:
+          type: integer
+        approvals_approved:
+          type: boolean
+        event_type:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        received_by:
+          type: string
+        payload_sha256:
+          type: string
+        signature:
+          type: string
+    GitlabWebhookResponse:
+      type: object
+      additionalProperties: false
+      required: [status, record]
+      properties:
+        status:
+          type: string
+          enum: [created, duplicate]
+        record:
+          $ref: "#/components/schemas/GitlabGovernanceRecord"
+    ModelImage:
+      type: object
+      additionalProperties: false
+      required: [image_digest, repo, commit_sha, pipeline_id, received_at, received_by]
+      properties:
+        image_digest:
+          type: string
+        repo:
+          type: string
+        commit_sha:
+          type: string
+        pipeline_id:
+          type: string
+        provider:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        received_by:
+          type: string
+        payload:
+          type: object
+    PolicySummary:
+      type: object
+      additionalProperties: false
+      required: [policy_id, name, created_at, created_by]
+      properties:
+        policy_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        latest_version:
+          $ref: "#/components/schemas/PolicyVersionSummary"
+    PolicyVersionSummary:
+      type: object
+      additionalProperties: false
+      required: [policy_version_id, version, status, spec_sha256, created_at, created_by]
+      properties:
+        policy_version_id:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [active, disabled]
+        spec_sha256:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    PolicyListResponse:
+      type: object
+      additionalProperties: false
+      required: [policies]
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicySummary"
+    PolicyVersion:
+      type: object
+      additionalProperties: false
+      required: [policy_version_id, policy_id, version, status, spec_yaml, spec, spec_sha256, created_at, created_by]
+      properties:
+        policy_version_id:
+          type: string
+        policy_id:
+          type: string
+        version:
+          type: integer
+        status:
+          type: string
+          enum: [active, disabled]
+        spec_yaml:
+          type: string
+        spec:
+          type: object
+          additionalProperties: true
+        spec_sha256:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    PolicyVersionListResponse:
+      type: object
+      additionalProperties: false
+      required: [policy_id, versions]
+      properties:
+        policy_id:
+          type: string
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyVersion"
+    CreatePolicyRequest:
+      type: object
+      additionalProperties: false
+      required: [name, spec]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        spec:
+          type: string
+          description: YAML policy specification.
+        status:
+          type: string
+          enum: [active, disabled]
+    CreatePolicyVersionRequest:
+      type: object
+      additionalProperties: false
+      required: [spec]
+      properties:
+        spec:
+          type: string
+          description: YAML policy specification.
+        status:
+          type: string
+          enum: [active, disabled]
+    PolicyDecisionSummary:
+      type: object
+      additionalProperties: false
+      required: [decision_id, policy_id, policy_version_id, policy_sha256, context_sha256, decision, created_at, created_by]
+      properties:
+        decision_id:
+          type: string
+        run_id:
+          type: string
+        policy_id:
+          type: string
+        policy_name:
+          type: string
+        policy_version_id:
+          type: string
+        policy_sha256:
+          type: string
+        context_sha256:
+          type: string
+        decision:
+          type: string
+          enum: [allow, deny, require_approval]
+        rule_id:
+          type: string
+        reason:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    PolicyDecisionDetail:
+      allOf:
+        - $ref: "#/components/schemas/PolicyDecisionSummary"
+        - type: object
+          additionalProperties: false
+          required: [context]
+          properties:
+            context:
+              type: object
+              additionalProperties: true
+    PolicyDecisionListResponse:
+      type: object
+      additionalProperties: false
+      required: [decisions]
+      properties:
+        decisions:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyDecisionSummary"
+    PolicyApprovalSummary:
+      type: object
+      additionalProperties: false
+      required: [approval_id, decision_id, status, requested_at, requested_by, policy_id, policy_name, policy_version_id, decision]
+      properties:
+        approval_id:
+          type: string
+        decision_id:
+          type: string
+        run_id:
+          type: string
+        status:
+          type: string
+          enum: [pending, approved, denied]
+        requested_at:
+          type: string
+          format: date-time
+        requested_by:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
+        decided_by:
+          type: string
+        reason:
+          type: string
+        policy_id:
+          type: string
+        policy_name:
+          type: string
+        policy_version_id:
+          type: string
+        decision:
+          type: string
+          enum: [allow, deny, require_approval]
+        rule_id:
+          type: string
+    PolicyApprovalDetail:
+      allOf:
+        - $ref: "#/components/schemas/PolicyApprovalSummary"
+        - type: object
+          additionalProperties: false
+          properties:
+            decision_context:
+              type: object
+              additionalProperties: true
+    PolicyApprovalListResponse:
+      type: object
+      additionalProperties: false
+      required: [approvals]
+      properties:
+        approvals:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicyApprovalSummary"
+    PolicyApprovalActionRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        reason:
+          type: string
+    PolicyApprovalActionResponse:
+      type: object
+      additionalProperties: false
+      required: [approval_id, approval_status, run_id, run_status]
+      properties:
+        approval_id:
+          type: string
+        approval_status:
+          type: string
+          enum: [pending, approved, denied]
+        run_id:
+          type: string
+        run_status:
+          type: string
+          enum: [pending, running, canceled]
+        execution_id:
+          type: string
+        datapilot_url:
+          type: string
+        pending:
+          type: integer
+    ModelImageListResponse:
+      type: object
+      additionalProperties: false
+      required: [model_images]
+      properties:
+        model_images:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelImage"
+    IngestExperimentRunMetricsRequest:
+      type: object
+      additionalProperties: false
+      required: [step, metrics]
+      properties:
+        step:
+          type: integer
+          format: int64
+          minimum: 0
+        metrics:
+          type: object
+          additionalProperties: true
+          description: Map of metric name to numeric value.
+        metadata:
+          type: object
+          additionalProperties: true
+    IngestExperimentRunMetricsResponse:
+      type: object
+      additionalProperties: false
+      required: [run_id, step, inserted, received, request_id]
+      properties:
+        run_id:
+          type: string
+        step:
+          type: integer
+          format: int64
+        inserted:
+          type: integer
+        received:
+          type: integer
+        request_id:
+          type: string
+    ExperimentRunMetricSample:
+      type: object
+      additionalProperties: false
+      required: [sample_id, run_id, recorded_at, recorded_by, step, name, value, metadata]
+      properties:
+        sample_id:
+          type: string
+        run_id:
+          type: string
+        recorded_at:
+          type: string
+          format: date-time
+        recorded_by:
+          type: string
+        step:
+          type: integer
+          format: int64
+        name:
+          type: string
+        value:
+          type: number
+        metadata:
+          type: object
+          additionalProperties: true
+    ExperimentRunMetricsResponse:
+      type: object
+      additionalProperties: false
+      required: [run_id, samples]
+      properties:
+        run_id:
+          type: string
+        name:
+          type: string
+        samples:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentRunMetricSample"
+    CreateExperimentRunEventRequest:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        occurred_at:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum: [debug, info, warn, error]
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    ExperimentRunEvent:
+      type: object
+      additionalProperties: false
+      required: [event_id, run_id, occurred_at, actor, level, message, metadata]
+      properties:
+        event_id:
+          type: integer
+          format: int64
+        run_id:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        level:
+          type: string
+        message:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    ExperimentRunEventListResponse:
+      type: object
+      additionalProperties: false
+      required: [run_id, events]
+      properties:
+        run_id:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExperimentRunEvent"
+        next_before_event_id:
+          type: integer
+          format: int64
+    CIWebhookRequest:
+      type: object
+      additionalProperties: true
+      required: [run_id]
+      properties:
+        run_id:
+          type: string
+        provider:
+          type: string
+    CIWebhookResponse:
+      type: object
+      additionalProperties: true
+      required: [context_id, run_id, payload_sha256]
+      properties:
+        status:
+          type: string
+        context_id:
+          type: string
+        run_id:
+          type: string
+        provider:
+          type: string
+        payload_sha256:
+          type: string
+        received_at:
+          type: string
+          format: date-time
+        received_by:
+          type: string
+        payload:
+          type: object
+
+    ExecutionPlan:
+      type: object
+      additionalProperties: true
+    ProjectRunCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [pipelineSpec, datasetBindings, codeRef, envLock, parameters]
+      properties:
+        idempotencyKey:
+          type: string
+        pipelineSpec:
+          type: object
+          additionalProperties: true
+        datasetBindings:
+          type: object
+          additionalProperties:
+            type: string
+        codeRef:
+          $ref: "#/components/schemas/CodeRef"
+        envLock:
+          $ref: "#/components/schemas/EnvironmentLockRef"
+        parameters:
+          type: object
+          additionalProperties: true
+    ProjectRunCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, status, created, specHash]
+      properties:
+        runId:
+          type: string
+        status:
+          type: string
+        created:
+          type: boolean
+        specHash:
+          type: string
+    ProjectRunDispatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        idempotencyKey:
+          type: string
+    ProjectRunDispatchResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, projectId, dispatchId, status, dpBaseUrl, created]
+      properties:
+        runId:
+          type: string
+        projectId:
+          type: string
+        dispatchId:
+          type: string
+        status:
+          type: string
+        dpBaseUrl:
+          type: string
+        created:
+          type: boolean
+    RegistryPolicyMode:
+      type: string
+      enum: [allow_unsigned, deny_unsigned, verify_only]
+    ImageVerificationRecord:
+      type: object
+      additionalProperties: false
+      required: [projectId, imageDigestRef, policyMode, provider, status, signed, verified, createdAt]
+      properties:
+        projectId:
+          type: string
+        imageDigestRef:
+          type: string
+        policyMode:
+          $ref: "#/components/schemas/RegistryPolicyMode"
+        provider:
+          type: string
+        status:
+          type: string
+        signed:
+          type: boolean
+        verified:
+          type: boolean
+        failureReason:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+        verifiedAt:
+          type: string
+          format: date-time
+    ImageVerificationListResponse:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImageVerificationRecord"
+    WebhookEventType:
+      type: string
+      enum: [RunFinished, ModelApproved, DatasetVersionCreated]
+    WebhookDeliveryStatus:
+      type: string
+      enum: [PENDING, DELIVERED, FAILED, DISABLED]
+    WebhookEventSubject:
+      type: object
+      additionalProperties: false
+      properties:
+        run_id:
+          type: string
+        model_version_id:
+          type: string
+        dataset_version_id:
+          type: string
+    WebhookEventPayload:
+      type: object
+      additionalProperties: false
+      required: [event_id, event_type, emitted_at, project_id, subject]
+      properties:
+        event_id:
+          type: string
+        event_type:
+          $ref: "#/components/schemas/WebhookEventType"
+        emitted_at:
+          type: string
+          format: date-time
+        project_id:
+          type: string
+        subject:
+          $ref: "#/components/schemas/WebhookEventSubject"
+        api_links:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, target_url, event_types]
+      properties:
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    WebhookSubscriptionResponse:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, name, target_url, enabled, event_types, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        name:
+          type: string
+        target_url:
+          type: string
+        enabled:
+          type: boolean
+        event_types:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookEventType"
+        secret_ref:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookSubscriptionListResponse:
+      type: object
+      additionalProperties: false
+      required: [subscriptions]
+      properties:
+        subscriptions:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookSubscriptionResponse"
+    WebhookDelivery:
+      type: object
+      additionalProperties: false
+      required: [id, project_id, subscription_id, event_id, event_type, status, next_attempt_at, attempt_count, created_at, updated_at]
+      properties:
+        id:
+          type: string
+        project_id:
+          type: string
+        subscription_id:
+          type: string
+        event_id:
+          type: string
+        event_type:
+          $ref: "#/components/schemas/WebhookEventType"
+        status:
+          $ref: "#/components/schemas/WebhookDeliveryStatus"
+        next_attempt_at:
+          type: string
+          format: date-time
+        attempt_count:
+          type: integer
+        last_error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    WebhookDeliveryListResponse:
+      type: object
+      additionalProperties: false
+      required: [deliveries]
+      properties:
+        deliveries:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDelivery"
+    WebhookDeliveryAttempt:
+      type: object
+      additionalProperties: false
+      required: [id, delivery_id, attempted_at, outcome, created_at]
+      properties:
+        id:
+          type: integer
+        delivery_id:
+          type: string
+        attempted_at:
+          type: string
+          format: date-time
+        status_code:
+          type: integer
+        outcome:
+          type: string
+        error:
+          type: string
+        latency_ms:
+          type: integer
+        request_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    WebhookDeliveryAttemptListResponse:
+      type: object
+      additionalProperties: false
+      required: [attempts]
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/WebhookDeliveryAttempt"
+    WebhookDeliveryReplayRequest:
+      type: object
+      additionalProperties: false
+      required: [replay_token]
+      properties:
+        replay_token:
+          type: string
+    WebhookDeliveryReplayResponse:
+      type: object
+      additionalProperties: false
+      required: [delivery_id, scheduled]
+      properties:
+        delivery_id:
+          type: string
+        scheduled:
+          type: boolean
+    ProjectRunGetResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, status, state, specHash, createdAt, planExists, runSpec]
+      properties:
+        runId:
+          type: string
+        status:
+          type: string
+        state:
+          type: string
+        specHash:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        planExists:
+          type: boolean
+        attemptsByStep:
+          type: object
+          additionalProperties:
+            type: integer
+        runSpec:
+          $ref: "#/components/schemas/RunSpec"
+    ProjectRunPlanSummary:
+      type: object
+      additionalProperties: false
+      required: [runId, stepCount, stepNames, state]
+      properties:
+        runId:
+          type: string
+        stepCount:
+          type: integer
+        stepNames:
+          type: array
+          items:
+            type: string
+        state:
+          type: string
+    ProjectRunDryRunResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, status, state, existing, steps]
+      properties:
+        runId:
+          type: string
+        status:
+          type: string
+        state:
+          type: string
+        attemptsByStep:
+          type: object
+          additionalProperties:
+            type: integer
+        existing:
+          type: boolean
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/DryRunStepResult"
+    ProjectRunDryRunExecutionsResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, state, planExists, executions]
+      properties:
+        runId:
+          type: string
+        state:
+          type: string
+        planExists:
+          type: boolean
+        attemptsByStep:
+          type: object
+          additionalProperties:
+            type: integer
+        executions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectRunStepExecution"
+    DryRunStepResult:
+      type: object
+      additionalProperties: false
+      required: [stepName, attempt, status]
+      properties:
+        stepName:
+          type: string
+        attempt:
+          type: integer
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+    ProjectRunStepExecution:
+      type: object
+      additionalProperties: false
+      required: [stepName, attempt, status, startedAt]
+      properties:
+        stepName:
+          type: string
+        attempt:
+          type: integer
+        status:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        errorCode:
+          type: string
+        errorMessage:
+          type: string
+        result:
+          type: object
+          additionalProperties: true
+    ProjectRunReproducibilityBundle:
+      type: object
+      additionalProperties: false
+      required: [schema, runId, projectId, specHash, runSpec, policySnapshotSha256, generatedAt]
+      properties:
+        schema:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        specHash:
+          type: string
+        runSpec:
+          $ref: "#/components/schemas/RunSpec"
+        policySnapshotSha256:
+          type: string
+        generatedAt:
+          type: string
+          format: date-time
+        generatedBy:
+          type: string
+    RunSpec:
+      type: object
+      additionalProperties: false
+      required: [runSpecVersion, projectId, pipelineSpec, datasetBindings, codeRef, envLock, parameters, policySnapshot, createdAt]
+      properties:
+        runSpecVersion:
+          type: string
+        projectId:
+          type: string
+        pipelineSpec:
+          type: object
+          additionalProperties: true
+        datasetBindings:
+          type: object
+          additionalProperties:
+            type: string
+        codeRef:
+          $ref: "#/components/schemas/CodeRef"
+        envLock:
+          $ref: "#/components/schemas/EnvironmentLock"
+        parameters:
+          type: object
+          additionalProperties: true
+        policySnapshot:
+          $ref: "#/components/schemas/PolicySnapshot"
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+    CodeRef:
+      type: object
+      additionalProperties: false
+      required: [repoUrl, commitSha]
+      properties:
+        repoUrl:
+          type: string
+        commitSha:
+          type: string
+        path:
+          type: string
+        scmType:
+          type: string
+    EnvironmentLockRef:
+      type: object
+      additionalProperties: false
+      required: [lockId]
+      properties:
+        lockId:
+          type: string
+    EnvironmentBaseImage:
+      type: object
+      additionalProperties: false
+      required: [name, ref]
+      properties:
+        name:
+          type: string
+        ref:
+          type: string
+    EnvironmentResources:
+      type: object
+      additionalProperties: false
+      properties:
+        cpu:
+          type: string
+        memory:
+          type: string
+        gpu:
+          type: integer
+    EnvironmentImage:
+      type: object
+      additionalProperties: false
+      required: [name, ref, digest]
+      properties:
+        name:
+          type: string
+        ref:
+          type: string
+        digest:
+          type: string
+    EnvironmentDefinition:
+      type: object
+      additionalProperties: false
+      required: [environmentDefinitionId, projectId, name, version, baseImages, status, createdAt]
+      properties:
+        environmentDefinitionId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        version:
+          type: integer
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        status:
+          type: string
+        supersedesDefinitionId:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    EnvironmentDefinitionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name, baseImages]
+      properties:
+        idempotencyKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    EnvironmentDefinitionUpdateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        idempotencyKey:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        baseImages:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentBaseImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+    EnvironmentDefinitionResponse:
+      type: object
+      additionalProperties: false
+      required: [definition, created]
+      properties:
+        definition:
+          $ref: "#/components/schemas/EnvironmentDefinition"
+        created:
+          type: boolean
+    EnvironmentDefinitionListResponse:
+      type: object
+      additionalProperties: false
+      required: [definitions]
+      properties:
+        definitions:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentDefinition"
+    EnvironmentLockCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [environmentDefinitionId, imageDigests]
+      properties:
+        idempotencyKey:
+          type: string
+        environmentDefinitionId:
+          type: string
+        imageDigests:
+          type: object
+          additionalProperties:
+            type: string
+        dependencyChecksums:
+          type: object
+          additionalProperties:
+            type: string
+        sbomRef:
+          type: string
+    EnvironmentLockResponse:
+      type: object
+      additionalProperties: false
+      required: [lock, created]
+      properties:
+        lock:
+          $ref: "#/components/schemas/EnvironmentLock"
+        created:
+          type: boolean
+    EnvironmentLockListResponse:
+      type: object
+      additionalProperties: false
+      required: [locks]
+      properties:
+        locks:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentLock"
+    EnvironmentLock:
+      type: object
+      additionalProperties: false
+      required: [lockId, environmentDefinitionId, environmentDefinitionVersion, images, envHash]
+      properties:
+        lockId:
+          type: string
+        projectId:
+          type: string
+        environmentDefinitionId:
+          type: string
+        environmentDefinitionVersion:
+          type: integer
+        images:
+          type: array
+          items:
+            $ref: "#/components/schemas/EnvironmentImage"
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        allowedAccelerators:
+          type: array
+          items:
+            type: string
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        dependencyChecksums:
+          type: object
+          additionalProperties:
+            type: string
+        sbomRef:
+          type: string
+        envHash:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    ModelStatus:
+      type: string
+      enum: [draft, validated, approved, deprecated]
+    Model:
+      type: object
+      additionalProperties: false
+      required: [modelId, projectId, name, version, status, createdAt]
+      properties:
+        modelId:
+          type: string
+        projectId:
+          type: string
+        name:
+          type: string
+        version:
+          type: string
+        status:
+          $ref: "#/components/schemas/ModelStatus"
+        artifactId:
+          type: string
+        metadata:
+          type: object
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    ModelCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        idempotencyKey:
+          type: string
+        name:
+          type: string
+        metadata:
+          type: object
+    ModelCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [model, created]
+      properties:
+        model:
+          $ref: "#/components/schemas/Model"
+        created:
+          type: boolean
+    ModelListResponse:
+      type: object
+      additionalProperties: false
+      required: [models]
+      properties:
+        models:
+          type: array
+          items:
+            $ref: "#/components/schemas/Model"
+    ModelVersion:
+      type: object
+      additionalProperties: false
+      required: [modelVersionId, projectId, modelId, version, status, runId, artifactIds, createdAt]
+      properties:
+        modelVersionId:
+          type: string
+        projectId:
+          type: string
+        modelId:
+          type: string
+        version:
+          type: string
+        status:
+          $ref: "#/components/schemas/ModelStatus"
+        runId:
+          type: string
+        artifactIds:
+          type: array
+          items:
+            type: string
+        datasetVersionIds:
+          type: array
+          items:
+            type: string
+        envLockId:
+          type: string
+        codeRef:
+          $ref: "#/components/schemas/CodeRef"
+        policySnapshotSha256:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    ModelVersionCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [version, runId, artifactIds]
+      properties:
+        idempotencyKey:
+          type: string
+        version:
+          type: string
+        runId:
+          type: string
+        artifactIds:
+          type: array
+          items:
+            type: string
+        datasetVersionIds:
+          type: array
+          items:
+            type: string
+    ModelVersionCreateResponse:
+      type: object
+      additionalProperties: false
+      required: [modelVersion, created]
+      properties:
+        modelVersion:
+          $ref: "#/components/schemas/ModelVersion"
+        created:
+          type: boolean
+    ModelVersionListResponse:
+      type: object
+      additionalProperties: false
+      required: [modelVersions]
+      properties:
+        modelVersions:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModelVersion"
+    ModelVersionProvenanceResponse:
+      type: object
+      additionalProperties: false
+      required: [modelVersionId, projectId, modelId, version, runId, artifactIds]
+      properties:
+        modelVersionId:
+          type: string
+        projectId:
+          type: string
+        modelId:
+          type: string
+        version:
+          type: string
+        runId:
+          type: string
+        artifactIds:
+          type: array
+          items:
+            type: string
+        datasetVersionIds:
+          type: array
+          items:
+            type: string
+        envLockId:
+          type: string
+        codeRef:
+          $ref: "#/components/schemas/CodeRef"
+        policySnapshotSha256:
+          type: string
+    ModelVersionTransitionResponse:
+      type: object
+      additionalProperties: false
+      required: [modelVersion]
+      properties:
+        modelVersion:
+          $ref: "#/components/schemas/ModelVersion"
+    ModelExport:
+      type: object
+      additionalProperties: false
+      required: [exportId, projectId, modelVersionId, status, createdAt]
+      properties:
+        exportId:
+          type: string
+        projectId:
+          type: string
+        modelVersionId:
+          type: string
+        status:
+          type: string
+        target:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        integritySha256:
+          type: string
+    ModelExportRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        target:
+          type: string
+    ModelExportResponse:
+      type: object
+      additionalProperties: false
+      required: [export, created]
+      properties:
+        export:
+          $ref: "#/components/schemas/ModelExport"
+        created:
+          type: boolean
+    DevEnvironmentState:
+      type: string
+      enum: [provisioning, active, failed, expired, deleted]
+    DevEnvironmentRefType:
+      type: string
+      enum: [branch, tag, commit]
+    DevEnvironment:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, templateRef, templateVersion, repoUrl, refType, refValue, imageName, imageRef, ttlSeconds, state, createdAt, expiresAt]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        templateRef:
+          type: string
+        templateDefinitionId:
+          type: string
+        templateVersion:
+          type: integer
+        templateIntegritySha256:
+          type: string
+        repoUrl:
+          type: string
+        refType:
+          $ref: "#/components/schemas/DevEnvironmentRefType"
+        refValue:
+          type: string
+        commitPin:
+          type: string
+        imageName:
+          type: string
+        imageRef:
+          type: string
+        ttlSeconds:
+          type: integer
+        state:
+          $ref: "#/components/schemas/DevEnvironmentState"
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        lastAccessAt:
+          type: string
+          format: date-time
+        policySnapshotSha256:
+          type: string
+        dpJobName:
+          type: string
+        dpNamespace:
+          type: string
+        integritySha256:
+          type: string
+    DevEnvironmentCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [templateRef, repoUrl, refType, refValue]
+      properties:
+        idempotencyKey:
+          type: string
+        templateRef:
+          type: string
+        repoUrl:
+          type: string
+        refType:
+          $ref: "#/components/schemas/DevEnvironmentRefType"
+        refValue:
+          type: string
+        commitPin:
+          type: string
+        imageName:
+          type: string
+        ttlSeconds:
+          type: integer
+    DevEnvironmentResponse:
+      type: object
+      additionalProperties: false
+      required: [environment, created]
+      properties:
+        environment:
+          $ref: "#/components/schemas/DevEnvironment"
+        created:
+          type: boolean
+    DevEnvironmentListResponse:
+      type: object
+      additionalProperties: false
+      required: [environments]
+      properties:
+        environments:
+          type: array
+          items:
+            $ref: "#/components/schemas/DevEnvironment"
+    DevEnvironmentAccessRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        ttlSeconds:
+          type: integer
+    DevEnvironmentAccessResponse:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, sessionId, expiresAt, proxyPath]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        sessionId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        proxyPath:
+          type: string
+        status:
+          type: string
+        message:
+          type: string
+    PolicySnapshot:
+      type: object
+      additionalProperties: false
+      required: [snapshotVersion, capturedAt, rbac, policies, snapshotSha256]
+      properties:
+        snapshotVersion:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+        capturedBy:
+          type: string
+        rbac:
+          $ref: "#/components/schemas/PolicySnapshotRBAC"
+        retention:
+          $ref: "#/components/schemas/PolicySnapshotRetention"
+        network:
+          $ref: "#/components/schemas/PolicySnapshotNetwork"
+        secrets:
+          $ref: "#/components/schemas/PolicySnapshotSecrets"
+        templates:
+          $ref: "#/components/schemas/PolicySnapshotTemplates"
+        policies:
+          type: array
+          items:
+            $ref: "#/components/schemas/PolicySnapshotPolicy"
+        snapshotSha256:
+          type: string
+    PolicySnapshotRBAC:
+      type: object
+      additionalProperties: false
+      required: [subject, roles, projectId]
+      properties:
+        subject:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        projectId:
+          type: string
+        decision:
+          type: string
+    PolicySnapshotRetention:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+        policyId:
+          type: string
+        policyVersionId:
+          type: string
+        policySha256:
+          type: string
+        legalHold:
+          type: boolean
+    PolicySnapshotNetwork:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+        allowlist:
+          type: array
+          items:
+            type: string
+        denylist:
+          type: array
+          items:
+            type: string
+        classRef:
+          type: string
+    PolicySnapshotSecrets:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+        classRef:
+          type: string
+    PolicySnapshotTemplates:
+      type: object
+      additionalProperties: false
+      required: [mode]
+      properties:
+        mode:
+          type: string
+        allowedTemplateIds:
+          type: array
+          items:
+            type: string
+    PolicySnapshotPolicy:
+      type: object
+      additionalProperties: false
+      required: [policyId, policyVersionId, policySha256, status]
+      properties:
+        policyId:
+          type: string
+        policyName:
+          type: string
+        policyVersionId:
+          type: string
+        policyVersion:
+          type: integer
+        policySha256:
+          type: string
+        status:
+          type: string
+    StatusResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+    RoleBinding:
+      type: object
+      additionalProperties: false
+      required: [binding_id, project_id, subject_type, subject, role, created_at, created_by, updated_at, updated_by]
+      properties:
+        binding_id:
+          type: string
+        project_id:
+          type: string
+        subject_type:
+          type: string
+          enum: [subject, email, group, service]
+        subject:
+          type: string
+        role:
+          type: string
+          enum: [viewer, editor, admin]
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+        updated_at:
+          type: string
+          format: date-time
+        updated_by:
+          type: string
+    RoleBindingRequest:
+      type: object
+      additionalProperties: false
+      required: [subject_type, subject, role]
+      properties:
+        subject_type:
+          type: string
+          enum: [subject, email, group, service]
+        subject:
+          type: string
+        role:
+          type: string
+          enum: [viewer, editor, admin]
+    RoleBindingResponse:
+      type: object
+      additionalProperties: false
+      required: [binding, created]
+      properties:
+        binding:
+          $ref: "#/components/schemas/RoleBinding"
+        created:
+          type: boolean
+    RoleBindingListResponse:
+      type: object
+      additionalProperties: false
+      required: [bindings]
+      properties:
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/RoleBinding"

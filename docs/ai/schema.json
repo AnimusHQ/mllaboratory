@@ -1,0 +1,27 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  "name": "Animus Datalab",
+  "codeRepository": "https://github.com/AnimusHQ/mllaboratory",
+  "programmingLanguage": ["Go", "SQL", "Shell"],
+  "runtimePlatform": "Kubernetes",
+  "license": "https://github.com/AnimusHQ/mllaboratory/blob/main/LICENSE",
+  "description": "Open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows.",
+  "applicationCategory": "MLOps",
+  "operatingSystem": "Linux",
+  "keywords": [
+    "MLOps",
+    "machine learning platform",
+    "reproducible ML",
+    "auditable ML",
+    "Kubernetes",
+    "PostgreSQL",
+    "OpenAPI",
+    "RBAC",
+    "audit evidence"
+  ],
+  "maintainer": {
+    "@type": "Person",
+    "email": "rewanderer@proton.me"
+  }
+}

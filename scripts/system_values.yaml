@@ -1,0 +1,20 @@
+auth:
+  mode: dev
+  sessionCookieSecure: false
+
+training:
+  executor: disabled
+
+evaluation:
+  enabled: false
+
+postgres:
+  persistence:
+    enabled: false
+
+minio:
+  persistence:
+    enabled: false
+
+ui:
+  enabled: false

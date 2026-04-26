@@ -1,0 +1,105 @@
+@import '../styles/tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  background: #081018;
+  color: #e8f4ff;
+  font-family: var(--font-sans), 'Space Grotesk', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial,
+    sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;
+}
+
+body {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body {
+    scroll-behavior: auto;
+  }
+}
+
+body[data-surface='ops'] {
+  background: #040910;
+}
+
+@layer components {
+  .console-surface {
+    @apply border text-card-foreground;
+    border-color: rgba(255, 255, 255, 0.12);
+    background: rgba(11, 22, 38, 0.9);
+    border-radius: 28px;
+    box-shadow: 0 28px 60px rgba(4, 10, 20, 0.6);
+  }
+
+  .console-section-title {
+    @apply text-xs font-semibold uppercase;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .console-kicker {
+    @apply text-xs uppercase;
+    letter-spacing: 0.3em;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .console-divider {
+    @apply border-t border-white/12;
+  }
+
+  .console-table {
+    @apply w-full text-sm border-collapse;
+  }
+
+  .console-table th {
+    @apply sticky top-0 text-left py-3 px-3 border-b;
+    background: rgba(11, 22, 38, 0.95);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: rgba(255, 255, 255, 0.6);
+    border-color: rgba(255, 255, 255, 0.12);
+  }
+
+  .console-table td {
+    @apply py-3 px-3 border-b align-top;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  .console-pill {
+    @apply inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold uppercase;
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: rgba(255, 255, 255, 0.8);
+  }
+}

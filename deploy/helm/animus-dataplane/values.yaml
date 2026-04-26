@@ -1,0 +1,60 @@
+profile: dev
+
+image:
+  repository: animus
+  tag: latest
+  digest: ""
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8086
+  serviceType: ClusterIP
+
+auth:
+  internalAuthSecret: animus-internal-dev-secret-change-me
+  allowDirectRoles: true
+
+controlPlane:
+  baseURL: ""
+
+k8s:
+  namespace: ""
+  jobTTLSeconds: 3600
+  jobServiceAccount: ""
+  rbac:
+    create: true
+
+runtime:
+  heartbeatInterval: 15s
+  statusPollInterval: 10s
+
+secrets:
+  provider: noop
+  leaseTTLSeconds: 600
+  staticJSON: ""
+  vault:
+    addr: ""
+    role: ""
+    authPath: "auth/kubernetes/login"
+    jwtPath: ""
+    namespace: ""
+    timeout: "5s"
+
+observability:
+  metrics:
+    enabled: true
+    path: /metrics
+  otel:
+    enabled: false
+    endpoint: ""
+    insecure: true
+    tracesExporter: otlp
+    metricsExporter: otlp
+    logsExporter: none
+    serviceName: animus-dataplane
+
+tests:
+  image:
+    repository: curlimages/curl
+    tag: "8.7.1"
+    digest: ""

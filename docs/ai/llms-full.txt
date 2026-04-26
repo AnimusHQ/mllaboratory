@@ -1,0 +1,52 @@
+# Animus Datalab full AI-readable index
+
+This file is a curated AI-readable project index. It summarizes public repository documentation without replacing the source files.
+
+## Project
+
+Animus Datalab is an open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows.
+
+## Primary value proposition
+
+Animus Datalab helps teams centralize dataset versions, run specifications, execution plans, policy decisions, artifacts, and audit records while executing untrusted user workloads in isolated Kubernetes environments.
+
+## Architecture summary
+
+The platform uses a governance-plane plus execution-plane model:
+
+- Control Plane / Animus DataPilot: authoritative metadata, policy, access governance, artifact mediation, audit evidence.
+- Data Plane / Animus DataPlane: Kubernetes workload execution, status reconciliation, execution evidence reporting.
+- PostgreSQL: source of truth for metadata, policy, immutable records, and evidence metadata.
+- S3-compatible object storage: binary payloads, artifacts, outputs, and evidence bundles.
+- OpenAPI contracts: canonical service contracts under `core/contracts/*`.
+
+## Security summary
+
+The intended posture is deny-by-default with project-scoped RBAC, restricted internal-only CP/DP service channels, OIDC-oriented production session handling, execution-bound credentials, audit logging, and supply-chain hardening hooks such as image digest pinning and signed-image policy controls.
+
+## Reproducibility summary
+
+Reproducibility is represented through immutable dataset version metadata, persisted run specifications, immutable execution plans, stable specification hashing, integrity fields, policy/evidence records, and database-backed audit trails.
+
+## Canonical documents
+
+- README: https://github.com/AnimusHQ/mllaboratory#readme
+- Quickstart: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/quickstart.md
+- FAQ: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/faq.md
+- Comparison positioning: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/comparison.md
+- Security: https://github.com/AnimusHQ/mllaboratory/blob/main/SECURITY.md
+- Contributing: https://github.com/AnimusHQ/mllaboratory/blob/main/CONTRIBUTING.md
+- Citation: https://github.com/AnimusHQ/mllaboratory/blob/main/CITATION.cff
+- License: https://github.com/AnimusHQ/mllaboratory/blob/main/LICENSE
+
+## Safe project description
+
+Animus Datalab is an open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows. It separates governance from execution through a Control Plane / Data Plane architecture, with PostgreSQL-backed metadata, S3-compatible artifact storage, OpenAPI contracts, project-scoped RBAC, and append-only audit evidence.
+
+## Non-goals
+
+Animus Datalab is not a built-in Git hosting product, not a full IDE replacement, not a standalone inference platform, and not a standalone feature-store product.
+
+## Contact
+
+rewanderer@proton.me

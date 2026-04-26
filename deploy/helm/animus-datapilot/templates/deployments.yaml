@@ -1,0 +1,174 @@
+{{- $datasetRegistry := index .Values.services "dataset-registry" -}}
+{{- $quality := index .Values.services "quality" -}}
+{{- $experiments := index .Values.services "experiments" -}}
+{{- $lineage := index .Values.services "lineage" -}}
+{{- $audit := index .Values.services "audit" -}}
+{{- range $name, $svc := .Values.services }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "animus-datapilot.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "animus-datapilot.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $name }}
+  template:
+    metadata:
+      labels:
+        {{- include "animus-datapilot.labels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $name }}
+    spec:
+      containers:
+        - name: {{ $name }}
+          image: "{{ include "animus-datapilot.serviceImage" (dict "root" $ "name" $name) }}"
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          env:
+            - name: ANIMUS_PROFILE
+              value: {{ default "dev" $.Values.profile | quote }}
+            - name: {{ upper (replace "-" "_" $name) }}_HTTP_ADDR
+              value: "0.0.0.0:{{ $svc.port }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: databaseUrl
+            - name: ANIMUS_INTERNAL_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: internalAuthSecret
+            {{- if $.Values.observability.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ $.Values.observability.otel.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: {{ $.Values.observability.otel.insecure | quote }}
+            - name: OTEL_TRACES_EXPORTER
+              value: {{ $.Values.observability.otel.tracesExporter | quote }}
+            - name: OTEL_METRICS_EXPORTER
+              value: {{ $.Values.observability.otel.metricsExporter | quote }}
+            - name: OTEL_LOGS_EXPORTER
+              value: {{ $.Values.observability.otel.logsExporter | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ printf "%s-%s" $.Values.observability.otel.serviceNamePrefix $name | quote }}
+            {{- end }}
+            {{- if eq $name "gateway" }}
+            - name: AUTH_MODE
+              value: {{ $.Values.auth.mode | quote }}
+            - name: AUTH_ROLES_CLAIM
+              value: {{ $.Values.oidc.rolesClaim | quote }}
+            - name: AUTH_EMAIL_CLAIM
+              value: {{ $.Values.oidc.emailClaim | quote }}
+            - name: AUTH_SESSION_COOKIE_NAME
+              value: {{ $.Values.oidc.sessionCookieName | quote }}
+            - name: AUTH_SESSION_COOKIE_SECURE
+              value: {{ $.Values.auth.sessionCookieSecure | quote }}
+            - name: AUTH_SESSION_MAX_AGE_SECONDS
+              value: {{ $.Values.oidc.sessionMaxAgeSeconds | quote }}
+            - name: AUTH_SESSION_COOKIE_SAMESITE
+              value: {{ $.Values.oidc.sessionCookieSameSite | quote }}
+            {{- if eq $.Values.auth.mode "oidc" }}
+            - name: OIDC_ISSUER_URL
+              value: {{ required "oidc.issuerURL is required when auth.mode=oidc" $.Values.oidc.issuerURL | quote }}
+            - name: OIDC_CLIENT_ID
+              value: {{ required "oidc.clientID is required when auth.mode=oidc" $.Values.oidc.clientID | quote }}
+            - name: OIDC_SCOPES
+              value: {{ $.Values.oidc.scopes | quote }}
+            {{- if $.Values.oidc.redirectURL }}
+            - name: OIDC_REDIRECT_URL
+              value: {{ $.Values.oidc.redirectURL | quote }}
+            {{- end }}
+            - name: OIDC_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: oidcClientSecret
+            {{- end }}
+            - name: ANIMUS_CONSOLE_UPSTREAM_URL
+              value: {{ $.Values.console.upstreamURL | default (include "animus-datapilot.uiServiceURL" $) | quote }}
+            - name: ANIMUS_PUBLIC_BASE_URL
+              value: {{ $.Values.console.publicBaseURL | quote }}
+            - name: ANIMUS_ALLOWED_RETURN_TO_ORIGINS
+              value: {{ join "," (default (list) $.Values.console.allowedReturnToOrigins) | quote }}
+            - name: DATASET_REGISTRY_BASE_URL
+              value: {{ printf "http://%s-dataset-registry:%d" (include "animus-datapilot.fullname" $) ($datasetRegistry.port | int) | quote }}
+            - name: QUALITY_BASE_URL
+              value: {{ printf "http://%s-quality:%d" (include "animus-datapilot.fullname" $) ($quality.port | int) | quote }}
+            - name: EXPERIMENTS_BASE_URL
+              value: {{ printf "http://%s-experiments:%d" (include "animus-datapilot.fullname" $) ($experiments.port | int) | quote }}
+            - name: LINEAGE_BASE_URL
+              value: {{ printf "http://%s-lineage:%d" (include "animus-datapilot.fullname" $) ($lineage.port | int) | quote }}
+            - name: AUDIT_BASE_URL
+              value: {{ printf "http://%s-audit:%d" (include "animus-datapilot.fullname" $) ($audit.port | int) | quote }}
+            {{- end }}
+            {{- if or (eq $name "dataset-registry") (eq $name "quality") (eq $name "experiments") }}
+            - name: ANIMUS_MINIO_ENDPOINT
+              value: {{ include "animus-datapilot.minioEndpoint" $ | quote }}
+            - name: ANIMUS_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: minioAccessKey
+            - name: ANIMUS_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: minioSecretKey
+            - name: ANIMUS_MINIO_USE_SSL
+              value: {{ $.Values.minio.useSSL | quote }}
+            - name: ANIMUS_MINIO_REGION
+              value: {{ $.Values.minio.region | quote }}
+            - name: ANIMUS_MINIO_BUCKET_DATASETS
+              value: {{ $.Values.minio.buckets.datasets | quote }}
+            - name: ANIMUS_MINIO_BUCKET_ARTIFACTS
+              value: {{ $.Values.minio.buckets.artifacts | quote }}
+            {{- end }}
+            {{- if eq $name "experiments" }}
+            - name: ANIMUS_CI_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" $ }}
+                  key: ciWebhookSecret
+            - name: ANIMUS_DATAPILOT_URL
+              value: {{ $.Values.training.datapilotURL | default (include "animus-datapilot.gatewayServiceURL" $) | quote }}
+            - name: ANIMUS_RUN_TOKEN_TTL
+              value: {{ $.Values.training.runTokenTTL | quote }}
+            - name: ANIMUS_TRAINING_SYNC_INTERVAL
+              value: {{ $.Values.training.syncInterval | quote }}
+            - name: ANIMUS_EVALUATION_ENABLED
+              value: {{ $.Values.evaluation.enabled | quote }}
+            - name: ANIMUS_EVAL_PREVIEW_SAMPLES
+              value: {{ $.Values.evaluation.previewSamples | quote }}
+            - name: ANIMUS_EVALUATION_SYNC_INTERVAL
+              value: {{ $.Values.evaluation.syncInterval | default $.Values.training.syncInterval | quote }}
+            {{- if $.Values.evaluation.imageRef }}
+            - name: ANIMUS_EVALUATION_IMAGE_REF
+              value: {{ $.Values.evaluation.imageRef | quote }}
+            {{- end }}
+            - name: ANIMUS_TRAINING_K8S_NAMESPACE
+              value: {{ $.Values.training.k8s.namespace | default $.Release.Namespace | quote }}
+            - name: ANIMUS_TRAINING_K8S_JOB_TTL_SECONDS
+              value: {{ $.Values.training.k8s.jobTTLSeconds | quote }}
+            {{- if $.Values.training.k8s.jobServiceAccount }}
+            - name: ANIMUS_TRAINING_K8S_JOB_SERVICE_ACCOUNT
+              value: {{ $.Values.training.k8s.jobServiceAccount | quote }}
+            {{- end }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ $svc.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+---
+{{- end }}

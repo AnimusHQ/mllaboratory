@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "animus-dataplane.fullname" . }}
+  labels:
+    {{- include "animus-dataplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataplane
+  {{- if .Values.observability.metrics.enabled }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: {{ .Values.observability.metrics.path | quote }}
+    prometheus.io/port: {{ .Values.service.port | quote }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.serviceType | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: dataplane
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP

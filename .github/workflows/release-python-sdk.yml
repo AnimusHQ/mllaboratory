@@ -1,0 +1,79 @@
+name: release-python-sdk
+
+on:
+  push:
+    tags:
+      - "sdk-python-v*"
+
+permissions:
+  contents: read
+
+jobs:
+  build-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: detect submodule URL mode
+        id: submodule_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'url = TODO_(ENTERPRISE|SDK)_REPO_URL' .gitmodules; then
+            echo "real_urls=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "real_urls=1" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: checkout submodules (recursive)
+        if: steps.submodule_mode.outputs.real_urls == '1'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: load guardrail policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/guardrail_policy.env
+          if [[ "${{ steps.submodule_mode.outputs.real_urls }}" == "1" ]]; then
+            : "${ANIMUS_RELEASE_SUBMODULE_ENFORCE:=1}"
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=${ANIMUS_RELEASE_SUBMODULE_ENFORCE}" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=1" >> "${GITHUB_ENV}"
+          else
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=0" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=0" >> "${GITHUB_ENV}"
+          fi
+      - name: submodule-check (visibility/enforcement gate)
+        run: make submodule-check
+      - name: require real submodule URLs for SDK release
+        if: steps.submodule_mode.outputs.real_urls != '1'
+        run: |
+          echo "release-python-sdk: .gitmodules still contains TODO_* URLs." >&2
+          echo "release-python-sdk: set real enterprise/sdk URLs before publishing." >&2
+          exit 1
+      - name: initialize sdk submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          git submodule sync -- sdk
+          git submodule update --init --recursive sdk
+      - name: submodule-check (initialized sdk required)
+        env:
+          ANIMUS_SUBMODULE_CHECK_ENFORCE: "1"
+          ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT: "1"
+        run: make submodule-check
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Resolve SDK path
+        run: echo "SDK_DIR=$(make -s sdk-path)" >> "${GITHUB_ENV}"
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade pip build twine
+          cd "${SDK_DIR}/python"
+          python -m build
+          python -m twine check dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: ${{ env.SDK_DIR }}/python/dist
+          password: ${{ secrets.PYPI_API_TOKEN }}

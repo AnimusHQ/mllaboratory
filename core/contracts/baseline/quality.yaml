@@ -1,0 +1,397 @@
+openapi: 3.0.3
+info:
+  title: Animus Quality API
+  version: 0.2.0
+  description: |
+    Quality rules and evaluations for dataset versions.
+
+    In most deployments this service is accessed through the gateway (which enforces auth/RBAC).
+servers:
+  - url: http://localhost:8082
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /rules:
+    get:
+      summary: List quality rules
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RuleListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Create a quality rule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRuleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QualityRule"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Rule name already exists
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /rules/{rule_id}:
+    get:
+      summary: Get quality rule by ID
+      parameters:
+        - name: rule_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QualityRule"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /evaluations:
+    get:
+      summary: List evaluations for a dataset version
+      parameters:
+        - name: dataset_version_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EvaluationListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      summary: Evaluate a quality rule against a dataset version
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateEvaluationRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Dataset version or rule not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: Artifact store failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /evaluations/{evaluation_id}:
+    get:
+      summary: Get evaluation by ID
+      parameters:
+        - name: evaluation_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Evaluation"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /gates/dataset-versions/{version_id}:
+    get:
+      summary: Get gate status for a dataset version
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GateStatus"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status]
+      properties:
+        service:
+          type: string
+        status:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    RuleSpec:
+      type: object
+      additionalProperties: false
+      required: [schema, checks]
+      properties:
+        schema:
+          type: string
+          example: animus.quality.rule.v1
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/CheckSpec"
+    CheckSpec:
+      type: object
+      additionalProperties: false
+      required: [id, type]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          description: One of object_size_bytes, content_type_in, filename_suffix_in, metadata_required_keys, csv_header_has_columns, verify_content_sha256, content_sha256_in.
+        min_bytes:
+          type: integer
+          format: int64
+        max_bytes:
+          type: integer
+          format: int64
+        allowed:
+          type: array
+          items:
+            type: string
+        keys:
+          type: array
+          items:
+            type: string
+        columns:
+          type: array
+          items:
+            type: string
+        delimiter:
+          type: string
+    QualityRule:
+      type: object
+      additionalProperties: false
+      required: [rule_id, name, spec, created_at, created_by]
+      properties:
+        rule_id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        spec:
+          $ref: "#/components/schemas/RuleSpec"
+        created_at:
+          type: string
+          format: date-time
+        created_by:
+          type: string
+    CreateRuleRequest:
+      type: object
+      additionalProperties: false
+      required: [name, spec]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        spec:
+          $ref: "#/components/schemas/RuleSpec"
+    RuleListResponse:
+      type: object
+      additionalProperties: false
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: "#/components/schemas/QualityRule"
+    CreateEvaluationRequest:
+      type: object
+      additionalProperties: false
+      required: [dataset_version_id]
+      properties:
+        dataset_version_id:
+          type: string
+        rule_id:
+          type: string
+          description: Optional override; if omitted, uses the dataset version's quality_rule_id.
+    EvaluationSummary:
+      type: object
+      additionalProperties: false
+      required: [checks_total, checks_pass, checks_fail, checks_error]
+      properties:
+        checks_total:
+          type: integer
+        checks_pass:
+          type: integer
+        checks_fail:
+          type: integer
+        checks_error:
+          type: integer
+        failing_check_ids:
+          type: array
+          items:
+            type: string
+    Evaluation:
+      type: object
+      additionalProperties: false
+      required: [evaluation_id, dataset_version_id, rule_id, status, evaluated_at, evaluated_by, summary, report_object_key, report_sha256, report_size_bytes]
+      properties:
+        evaluation_id:
+          type: string
+        dataset_version_id:
+          type: string
+        rule_id:
+          type: string
+        status:
+          type: string
+          description: One of pass, fail, error.
+        evaluated_at:
+          type: string
+          format: date-time
+        evaluated_by:
+          type: string
+        summary:
+          $ref: "#/components/schemas/EvaluationSummary"
+        report_object_key:
+          type: string
+        report_sha256:
+          type: string
+        report_size_bytes:
+          type: integer
+          format: int64
+    EvaluationListResponse:
+      type: object
+      additionalProperties: false
+      required: [evaluations]
+      properties:
+        evaluations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Evaluation"
+    GateStatus:
+      type: object
+      additionalProperties: false
+      required: [dataset_version_id, status]
+      properties:
+        dataset_version_id:
+          type: string
+        rule_id:
+          type: string
+        status:
+          type: string
+          description: One of pass, fail, error, not_evaluated, no_rule.
+        evaluation_id:
+          type: string
+        evaluated_at:
+          type: string
+          format: date-time

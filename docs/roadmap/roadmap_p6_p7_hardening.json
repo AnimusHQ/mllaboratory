@@ -1,0 +1,108 @@
+{
+  "meta": {
+    "name": "Animus Datalab — P6/P7 Hardening (Security & Operational Readiness)",
+    "roadmap_version": 3,
+    "addon_version": "p6-p7",
+    "generated_at": "2026-02-04",
+    "language": "ru-RU",
+    "scope": "Усиление безопасности, аудита и эксплуатационной готовности без изменения семантики M2–M9 и P5 (кроме исправления дефектов)."
+  },
+  "principles": [
+    "Control Plane не выполняет пользовательский код",
+    "Аудит append-only и неотключаемый",
+    "Секреты не попадают в логи, метрики, аудит и ответы API",
+    "Deny-by-default для RBAC и сетевых разрешений",
+    "Идемпотентность обязательна для операций с ретраями",
+    "Все изменения тестируемы и наблюдаемы"
+  ],
+  "workstreams": [
+    {
+      "id": "S1",
+      "name": "RBAC и авторизация",
+      "objectives": [
+        "Полное покрытие RBAC на всех эндпоинтах",
+        "Негативные тесты на cross-project доступ",
+        "Аудит решений по доступу"
+      ],
+      "deliverables": [
+        "Исправления проверок RBAC",
+        "Тесты deny-by-default",
+        "Документация по enforced RBAC"
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Сессии и идентификация",
+      "objectives": [
+        "Строгий TTL сессий",
+        "Принудительный logout",
+        "Ограничение параллельных сессий"
+      ],
+      "deliverables": [
+        "Хардениг session middleware",
+        "Аудит SessionCreated/Expired/Revoked",
+        "Тесты на TTL и revoke"
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Сеть и секреты",
+      "objectives": [
+        "Deny-by-default egress в DP",
+        "Нет bypass путей для секретов",
+        "Регрессия редактирования в аварийных путях"
+      ],
+      "deliverables": [
+        "Политики/шаблоны сетевых ограничений",
+        "Проверки доступа к секретам",
+        "Тесты на редактирование"
+      ]
+    },
+    {
+      "id": "O1",
+      "name": "Наблюдаемость и SLO",
+      "objectives": [
+        "Закрытие метрик по ошибкам/латентности",
+        "Сквозные корреляционные идентификаторы",
+        "Базовые SLO и дашборды"
+      ],
+      "deliverables": [
+        "Метрики и трассировка",
+        "Документ SLO",
+        "Шаблоны дашбордов"
+      ]
+    },
+    {
+      "id": "O3",
+      "name": "Идемпотентность и ретраи",
+      "objectives": [
+        "Инъекция сбоев без порчи состояния",
+        "Подтверждение идемпотентности",
+        "Тесты retry-storm"
+      ],
+      "deliverables": [
+        "Тесты на сбои",
+        "Документирование failure-modes"
+      ]
+    },
+    {
+      "id": "O2",
+      "name": "Backup/Restore и DR",
+      "objectives": [
+        "Проверка backup/restore",
+        "DR game-day",
+        "RPO/RTO отчёт"
+      ],
+      "deliverables": [
+        "Отчёты и обновлённые runbooks",
+        "Документ DR game-day"
+      ]
+    }
+  ],
+  "gates": [
+    "make guardrails-check",
+    "make openapi-lint",
+    "./scripts/go_test.sh ./closed/...",
+    "make integrations-test"
+  ]
+}

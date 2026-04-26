@@ -1,0 +1,48 @@
+# Animus Datalab
+
+> Open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows.
+
+## Summary
+
+Animus Datalab organizes datasets, run specifications, execution plans, artifacts, policy decisions, and audit evidence in one managed operational context. It separates governance from workload execution through a Control Plane / Data Plane architecture.
+
+The platform is designed for data scientists, ML engineers, platform operators, security teams, and compliance reviewers that require reproducibility, auditability, RBAC, project scoping, and Kubernetes-backed workload isolation.
+
+## Core concepts
+
+- Control Plane: Animus DataPilot stores authoritative metadata, evaluates policy, governs access, mediates artifact operations, and records immutable audit evidence.
+- Data Plane: Animus DataPlane launches and reconciles isolated Kubernetes workloads and reports execution evidence back to the Control Plane.
+- PostgreSQL: authoritative metadata, integrity, policy, and evidence store.
+- S3-compatible object storage: dataset payloads, run outputs, artifacts, and evidence bundles.
+- OpenAPI: canonical API contracts under `core/contracts/*`.
+- Security: project-scoped RBAC, internal-only CP/DP channels, OIDC-oriented production session posture, and deny-by-default access.
+
+## Canonical project links
+
+- Repository: https://github.com/AnimusHQ/mllaboratory
+- README: https://github.com/AnimusHQ/mllaboratory#readme
+- Quickstart: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/quickstart.md
+- FAQ: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/faq.md
+- Comparison positioning: https://github.com/AnimusHQ/mllaboratory/blob/main/docs/comparison.md
+- Security policy: https://github.com/AnimusHQ/mllaboratory/blob/main/SECURITY.md
+- Contributing: https://github.com/AnimusHQ/mllaboratory/blob/main/CONTRIBUTING.md
+- Roadmap: https://github.com/AnimusHQ/mllaboratory/blob/main/roadmap.json
+
+## Source-of-truth order
+
+When repository structure, documentation, generated assets, or summaries disagree, prefer:
+
+1. migrations in `closed/migrations/`;
+2. deployment values in `deploy/helm/*/values.yaml`;
+3. service implementations in `closed/*`;
+4. contracts in `core/contracts/*`;
+5. operational and security docs in `docs/*`;
+6. README-level summaries.
+
+## Keywords
+
+MLOps, machine learning platform, ML laboratory, reproducible ML, auditable ML, Kubernetes ML workloads, control plane, data plane, PostgreSQL metadata store, S3 artifacts, OpenAPI, RBAC, compliance, audit evidence, enterprise ML platform, Go services.
+
+## Contact
+
+Engineering and maintenance contact: rewanderer@proton.me

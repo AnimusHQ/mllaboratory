@@ -1,0 +1,30 @@
+/* Synced from closed/frontend_landing/styles/globals.css */
+:root {
+  --font-sans: 'Space Grotesk', var(--font-inter), Inter, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --background: 217 68% 3%;
+  --foreground: 208 100% 97%;
+  --muted: 212 26% 15%;
+  --muted-foreground: 216 24% 72%;
+  --popover: 217 63% 4%;
+  --popover-foreground: 213 100% 96%;
+  --card: 217 63% 5%;
+  --card-foreground: 0 0% 100%;
+  --border: 215 27% 20%;
+  --input: 215 27% 20%;
+  --primary: 207 86% 61%;
+  --primary-foreground: 210 100% 98%;
+  --secondary: 199 70% 56%;
+  --secondary-foreground: 210 100% 96%;
+  --accent: 165 82% 60%;
+  --accent-foreground: 210 100% 5%;
+  --destructive: 0 90% 62%;
+  --destructive-foreground: 210 40% 98%;
+  --ring: 207 86% 61%;
+  --radius: 0.8rem;
+}
+
+:root[data-surface='ops'] {
+  --background: 210 60% 6%;
+  --card: 210 65% 9%;
+}

@@ -1,0 +1,494 @@
+openapi: 3.0.3
+info:
+  title: Animus Audit API
+  version: 0.2.0
+  description: |
+    Central audit event query API.
+
+    In most deployments this service is accessed through the gateway (which enforces auth/RBAC).
+servers:
+  - url: http://localhost:8085
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /events:
+    get:
+      summary: List audit events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: before_event_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Pagination cursor (exclusive).
+        - name: actor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: resource_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: request_id
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /events/{event_id}:
+    get:
+      summary: Get audit event by ID
+      parameters:
+        - name: event_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEvent"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/audit/exports/sinks:
+    get:
+      summary: List audit export sinks
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportSinkListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/audit/exports/deliveries:
+    get:
+      summary: List audit export deliveries
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: sink_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportDeliveryListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/audit/exports/deliveries/{delivery_id}/attempts:
+    get:
+      summary: List audit export delivery attempts
+      parameters:
+        - name: delivery_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportAttemptListResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /admin/audit/exports/dlq/{delivery_id}:replay:
+    post:
+      summary: Replay audit export delivery from DLQ
+      parameters:
+        - name: delivery_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: Idempotency-Key
+          in: header
+          required: false
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExportReplayRequest"
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExportReplayResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Not eligible for replay
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status]
+      properties:
+        service:
+          type: string
+        status:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, request_id]
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    AuditEvent:
+      type: object
+      additionalProperties: false
+      required:
+        [event_id, occurred_at, actor, action, resource_type, resource_id, payload, integrity_sha256]
+      properties:
+        event_id:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        action:
+          type: string
+        resource_type:
+          type: string
+        resource_id:
+          type: string
+        request_id:
+          type: string
+        ip:
+          type: string
+        user_agent:
+          type: string
+        payload:
+          type: object
+        integrity_sha256:
+          type: string
+    AuditEventListResponse:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEvent"
+        next_before_event_id:
+          type: integer
+    ExportSinkConfig:
+      type: object
+      additionalProperties: false
+      properties:
+        webhook_url:
+          type: string
+        webhook_secret_ref:
+          type: string
+        webhook_signing_key:
+          type: string
+        syslog_addr:
+          type: string
+        syslog_protocol:
+          type: string
+        syslog_tag:
+          type: string
+    ExportSink:
+      type: object
+      additionalProperties: false
+      required: [sink_id, name, destination, format, enabled, config, created_at, updated_at]
+      properties:
+        sink_id:
+          type: string
+        name:
+          type: string
+        destination:
+          type: string
+        format:
+          type: string
+        enabled:
+          type: boolean
+        config:
+          $ref: "#/components/schemas/ExportSinkConfig"
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ExportSinkListResponse:
+      type: object
+      additionalProperties: false
+      required: [sinks]
+      properties:
+        sinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportSink"
+    ExportDelivery:
+      type: object
+      additionalProperties: false
+      required:
+        [delivery_id, sink_id, event_id, status, attempt_count, next_attempt_at, created_at, updated_at]
+      properties:
+        delivery_id:
+          type: integer
+        sink_id:
+          type: string
+        event_id:
+          type: integer
+        status:
+          type: string
+        attempt_count:
+          type: integer
+        next_attempt_at:
+          type: string
+          format: date-time
+        last_error:
+          type: string
+        dlq_reason:
+          type: string
+        delivered_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    ExportDeliveryListResponse:
+      type: object
+      additionalProperties: false
+      required: [deliveries]
+      properties:
+        deliveries:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportDelivery"
+    ExportAttempt:
+      type: object
+      additionalProperties: false
+      required: [attempt_id, delivery_id, attempted_at, outcome, created_at]
+      properties:
+        attempt_id:
+          type: integer
+        delivery_id:
+          type: integer
+        attempted_at:
+          type: string
+          format: date-time
+        outcome:
+          type: string
+        status_code:
+          type: integer
+        error:
+          type: string
+        latency_ms:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+    ExportAttemptListResponse:
+      type: object
+      additionalProperties: false
+      required: [attempts]
+      properties:
+        attempts:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExportAttempt"
+    ExportReplayRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        replay_token:
+          type: string
+    ExportReplayResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+

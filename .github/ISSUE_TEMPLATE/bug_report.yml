@@ -1,0 +1,54 @@
+name: Bug report
+description: Report a reproducible defect in Animus Datalab
+title: "bug: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a bug. Please do not include secrets, tokens, credentials, private object-store paths, or security-sensitive details. Report security issues privately through SECURITY.md.
+  - type: input
+    id: component
+    attributes:
+      label: Component
+      description: Gateway, dataset-registry, experiments, lineage, audit, dataplane, Helm, docs, local dev, etc.
+      placeholder: experiments
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Provide a minimal reproduction.
+      placeholder: |
+        1. Run `make dev`
+        2. Run `make dev DEV_ARGS=--smoke`
+        3. Observe ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Go version, Docker/Compose version, Kubernetes version, Helm version, branch or commit.
+    validations:
+      required: false

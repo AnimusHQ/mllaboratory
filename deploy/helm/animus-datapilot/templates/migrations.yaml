@@ -1,0 +1,91 @@
+{{- if .Values.migrations.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-migrations
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrations
+data:
+  {{- range $path, $file := .Files.Glob "migrations/*.up.sql" }}
+  {{ base $path }}: |
+{{ $file | toString | indent 4 }}
+  {{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-migrate
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "animus-datapilot.labels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ .Values.postgres.image | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" . }}
+                  key: databaseUrl
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+
+              echo "==> waiting for database"
+              for i in $(seq 1 60); do
+                if psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT 1" >/dev/null 2>&1; then
+                  break
+                fi
+                sleep 2
+              done
+
+              echo "==> ensuring schema_migrations"
+              psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 <<'SQL'
+              CREATE TABLE IF NOT EXISTS schema_migrations (
+                version BIGINT PRIMARY KEY,
+                name TEXT NOT NULL,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
+              );
+              SQL
+
+              for file in $(ls -1 /migrations/*.up.sql | sort); do
+                base=$(basename "${file}")
+                ver_raw=${base%%_*}
+                ver=$((10#${ver_raw}))
+                name="${base%.up.sql}"
+
+                if psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -Atqc "SELECT 1 FROM schema_migrations WHERE version = ${ver} LIMIT 1" | grep -q 1; then
+                  echo "==> skipping ${base}"
+                  continue
+                fi
+
+                echo "==> applying ${base}"
+                psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -f "${file}"
+                psql "${DATABASE_URL}" -v ON_ERROR_STOP=1 -c "INSERT INTO schema_migrations(version, name) VALUES (${ver}, '${name}')"
+              done
+
+              echo "==> migrations complete"
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "animus-datapilot.fullname" . }}-migrations
+{{- end }}

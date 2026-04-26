@@ -1,0 +1,40 @@
+FROM node:20-bullseye@sha256:66ccf8d19d2efc6c770027baf508aa5ee9f164dcecd2f73d7fd4fe55c7688173 AS deps
+
+WORKDIR /app
+
+COPY closed/ui/package.json closed/ui/package-lock.json ./
+RUN npm ci --no-audit
+
+FROM node:20-bullseye@sha256:66ccf8d19d2efc6c770027baf508aa5ee9f164dcecd2f73d7fd4fe55c7688173 AS builder
+
+WORKDIR /app
+
+ARG NEXT_PUBLIC_API_BASE
+ARG NEXT_PUBLIC_REQUIRE_TOKEN
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
+ENV NEXT_PUBLIC_REQUIRE_TOKEN=${NEXT_PUBLIC_REQUIRE_TOKEN}
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY closed/ui/ ./
+
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+FROM node:20-bullseye@sha256:66ccf8d19d2efc6c770027baf508aa5ee9f164dcecd2f73d7fd4fe55c7688173 AS runner
+
+WORKDIR /app
+
+ARG NEXT_PUBLIC_API_BASE
+ARG NEXT_PUBLIC_REQUIRE_TOKEN
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_BASE=${NEXT_PUBLIC_API_BASE}
+ENV NEXT_PUBLIC_REQUIRE_TOKEN=${NEXT_PUBLIC_REQUIRE_TOKEN}
+
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+EXPOSE 3000
+CMD ["npm", "start"]

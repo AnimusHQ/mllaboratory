@@ -1,0 +1,314 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "auth", "database", "postgres", "minio", "services"],
+  "properties": {
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "profile": {
+      "type": "string",
+      "enum": ["dev", "production"]
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "digest": {"type": "string"},
+        "digests": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
+        "pullPolicy": {"type": "string"}
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "internalAuthSecret"],
+      "properties": {
+        "mode": {"type": "string"},
+        "sessionCookieSecure": {"type": "boolean"},
+        "internalAuthSecret": {"type": "string", "minLength": 1}
+      }
+    },
+    "oidc": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "issuerURL": {"type": "string"},
+        "clientID": {"type": "string"},
+        "clientSecret": {"type": "string"},
+        "redirectURL": {"type": "string"},
+        "scopes": {"type": "string"},
+        "rolesClaim": {"type": "string"},
+        "emailClaim": {"type": "string"},
+        "sessionCookieName": {"type": "string"},
+        "sessionMaxAgeSeconds": {"type": "integer", "minimum": 1},
+        "sessionCookieSameSite": {"type": "string"}
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["webhookSecret"],
+      "properties": {
+        "webhookSecret": {"type": "string", "minLength": 1}
+      }
+    },
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {"type": "string"}
+      }
+    },
+    "postgres": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "image", "port", "user", "password", "db"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "image": {"type": "string"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "user": {"type": "string"},
+        "password": {"type": "string"},
+        "db": {"type": "string"},
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "size": {"type": "string"}
+          }
+        }
+      }
+    },
+    "minio": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "image", "mcImage", "apiPort", "consolePort", "rootUser", "rootPassword", "accessKey", "secretKey", "useSSL", "buckets", "region"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "image": {"type": "string"},
+        "mcImage": {"type": "string"},
+        "apiPort": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "consolePort": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "rootUser": {"type": "string"},
+        "rootPassword": {"type": "string"},
+        "accessKey": {"type": "string"},
+        "secretKey": {"type": "string"},
+        "endpoint": {"type": "string"},
+        "region": {"type": "string"},
+        "useSSL": {"type": "boolean"},
+        "buckets": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["datasets", "artifacts"],
+          "properties": {
+            "datasets": {"type": "string"},
+            "artifacts": {"type": "string"}
+          }
+        },
+        "persistence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "size": {"type": "string"}
+          }
+        }
+      }
+    },
+    "migrations": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"}
+      }
+    },
+    "services": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+          "serviceType": {"type": "string"}
+        }
+      }
+    },
+    "ui": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "serviceType": {"type": "string"},
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {"type": "string"},
+            "tag": {"type": "string"},
+            "digest": {"type": "string"},
+            "pullPolicy": {"type": "string"}
+          }
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "gatewayURL": {"type": "string"}
+          }
+        }
+      }
+    },
+    "console": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "upstreamURL": {"type": "string"},
+        "publicBaseURL": {"type": "string"},
+        "allowedReturnToOrigins": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "className": {"type": "string"},
+        "host": {"type": "string"},
+        "annotations": {"type": "object", "additionalProperties": true},
+        "tls": {"type": "array", "items": {"type": "object", "additionalProperties": true}}
+      }
+    },
+    "training": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "executor": {"type": "string"},
+        "datapilotURL": {"type": "string"},
+        "runTokenTTL": {"type": "string"},
+        "syncInterval": {"type": "string"},
+        "k8s": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "namespace": {"type": "string"},
+            "jobTTLSeconds": {"type": "integer", "minimum": 1},
+            "jobServiceAccount": {"type": "string"}
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "imageRef": {"type": "string"},
+        "previewSamples": {"type": "integer", "minimum": 1},
+        "syncInterval": {"type": "string"}
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "path": {"type": "string"}
+          }
+        },
+        "otel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "endpoint": {"type": "string"},
+            "insecure": {"type": "boolean"},
+            "tracesExporter": {"type": "string"},
+            "metricsExporter": {"type": "string"},
+            "logsExporter": {"type": "string"},
+            "serviceNamePrefix": {"type": "string"}
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {"type": "string"},
+            "tag": {"type": "string"},
+            "digest": {"type": "string"}
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "required": ["database"],
+          "properties": {
+            "database": {
+              "required": ["url"],
+              "properties": {
+                "url": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        },
+        {
+          "required": ["postgres"],
+          "properties": {
+            "postgres": {
+              "properties": {
+                "enabled": {"const": true}
+              }
+            }
+          }
+        }
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "required": ["minio"],
+          "properties": {
+            "minio": {
+              "properties": {
+                "enabled": {"const": true}
+              }
+            }
+          }
+        },
+        {
+          "required": ["minio"],
+          "properties": {
+            "minio": {
+              "required": ["endpoint"],
+              "properties": {
+                "endpoint": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,410 @@
+openapi: 3.0.3
+info:
+  title: Animus Lineage API
+  version: 0.2.0
+  description: |
+    Immutable lineage events and subgraph queries.
+
+    In most deployments this service is accessed through the gateway (which enforces auth/RBAC).
+servers:
+  - url: http://localhost:8084
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /readyz:
+    get:
+      summary: Readiness probe
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+  /events:
+    get:
+      summary: List lineage events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+        - name: before_event_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+          description: Pagination cursor (exclusive).
+        - name: subject_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: subject_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: object_type
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: object_id
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: predicate
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LineageEventListResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /subgraphs/datasets/{dataset_id}:
+    get:
+      summary: Dataset subgraph
+      parameters:
+        - name: dataset_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /subgraphs/dataset-versions/{version_id}:
+    get:
+      summary: Dataset version subgraph
+      parameters:
+        - name: version_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /subgraphs/experiment-runs/{run_id}:
+    get:
+      summary: Experiment run subgraph
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /runs/{run_id}:
+    get:
+      summary: Experiment run lineage
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /model-versions/{model_version_id}:
+    get:
+      summary: Model version lineage
+      parameters:
+        - name: model_version_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /subgraphs/git-commits/{commit}:
+    get:
+      summary: Git commit subgraph
+      parameters:
+        - name: commit
+          in: path
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Depth"
+        - $ref: "#/components/parameters/MaxEdges"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SubgraphResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  parameters:
+    Depth:
+      name: depth
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 5
+      description: BFS depth from root node (default 3).
+    MaxEdges:
+      name: max_edges
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 5000
+      description: Maximum number of edges to return (default 2000).
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [service, status]
+      properties:
+        service:
+          type: string
+        status:
+          type: string
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, request_id]
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    LineageNode:
+      type: object
+      additionalProperties: false
+      required: [type, id]
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+    LineageEvent:
+      type: object
+      additionalProperties: false
+      required:
+        [event_id, occurred_at, actor, subject_type, subject_id, predicate, object_type, object_id, metadata]
+      properties:
+        event_id:
+          type: integer
+        occurred_at:
+          type: string
+          format: date-time
+        actor:
+          type: string
+        request_id:
+          type: string
+        subject_type:
+          type: string
+        subject_id:
+          type: string
+        predicate:
+          type: string
+        object_type:
+          type: string
+        object_id:
+          type: string
+        metadata:
+          type: object
+    LineageEventListResponse:
+      type: object
+      additionalProperties: false
+      required: [events]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineageEvent"
+        next_before_event_id:
+          type: integer
+    SubgraphResponse:
+      type: object
+      additionalProperties: false
+      required: [root, nodes, edges]
+      properties:
+        root:
+          $ref: "#/components/schemas/LineageNode"
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineageNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/LineageEvent"

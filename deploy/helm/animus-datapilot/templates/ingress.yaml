@@ -1,0 +1,50 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-ingress
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ingress
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  rules:
+    - {{- if .Values.ingress.host }}
+      host: {{ .Values.ingress.host | quote }}
+      {{- end }}
+      http:
+        paths:
+          {{- if .Values.ui.enabled }}
+          - path: /app
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "animus-datapilot.fullname" . }}-ui
+                port:
+                  number: {{ .Values.ui.port }}
+          - path: /_next
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "animus-datapilot.fullname" . }}-ui
+                port:
+                  number: {{ .Values.ui.port }}
+          {{- end }}
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "animus-datapilot.fullname" . }}-gateway
+                port:
+                  number: {{ .Values.services.gateway.port }}
+{{- end }}

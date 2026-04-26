@@ -1,0 +1,60 @@
+# Closed assets (kept locally, not committed)
+/closed/*
+!/closed/internal/
+!/closed/internal/**/*
+!/closed/migrations/
+!/closed/migrations/*.sql
+!/closed/experiments/
+!/closed/experiments/*.go
+!/closed/dataplane/
+!/closed/dataplane/*.go
+!/closed/dataset-registry/
+!/closed/dataset-registry/*.go
+!/closed/lineage/
+!/closed/lineage/*.go
+!/closed/audit/
+!/closed/audit/*.go
+!/closed/deploy/
+!/closed/deploy/**/*
+!/closed/scripts/
+!/closed/scripts/**/*
+!/closed/e2e/
+!/closed/e2e/**/*
+/closed/frontend_landing/
+/closed/frontend_landing/**
+!/closed/frontend_console/
+!/closed/frontend_console/**/*
+
+# Next.js build output
+.next/
+frontend/.next/
+**/.next/
+**/dist-test/
+
+# Dependencies
+node_modules/
+
+# Go
+bin/
+*.out
+.cache/
+.gocache/
+artifacts/
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.venv/
+
+# Generated test builds
+
+# Environment (secrets)
+.env
+.env.*
+!.env.example
+
+next-build.log
+*.tsbuildinfo
+
+lab.md

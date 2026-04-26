@@ -1,0 +1,49 @@
+==> starting demo stack
+==> waiting for gateway <gateway_url>/healthz
+==> waiting for userspace <userspace_url>/healthz
+==> manual steps
+  1) POST /api/dataset-registry/projects
+  2) POST /api/dataset-registry/datasets (X-Project-Id)
+  3) POST /api/dataset-registry/datasets/{id}/versions/upload
+  4) POST /api/dataset-registry/projects/{project_id}/artifacts
+  5) POST /api/experiments/projects/{project_id}/runs
+  6) POST /api/experiments/projects/{project_id}/runs/{run_id}:plan
+  7) POST /api/experiments/projects/{project_id}/runs/{run_id}:dry-run
+  8) GET  /api/experiments/projects/{project_id}/runs/{run_id}
+  9) POST /api/audit/export
+=== Auth session ===
+==> auth session
+==> auth session not configured (dev stub in use)
+=== Create project ===
+==> create project
+project_id=<project_id>
+=== Create dataset ===
+==> create dataset
+dataset_id=<dataset_id>
+=== Upload dataset version ===
+==> upload dataset version
+dataset_version_id=<dataset_version_id>
+=== Create artifact ===
+==> create artifact (presigned upload)
+artifact_id=<artifact_id>
+=== Create run ===
+==> create run
+run_id=<run_id>
+spec_hash=<spec_hash>
+=== Plan ===
+==> plan run
+=== Dry-run ===
+==> dry-run
+dry_run_state=<dry_run_state>
+=== Derived state ===
+==> derived state
+derived_state=<derived_state>
+=== Userspace execution ===
+==> userspace execution (data plane surface)
+userspace_status=<userspace_status>
+=== Audit export ===
+==> audit export (first 3 lines)
+{"event_id":<event_id>,"action":"<action>","resource_type":"<resource_type>","resource_id":"<resource_id>"}
+{"event_id":<event_id>,"action":"<action>","resource_type":"<resource_type>","resource_id":"<resource_id>"}
+{"event_id":<event_id>,"action":"<action>","resource_type":"<resource_type>","resource_id":"<resource_id>"}
+==> demo complete

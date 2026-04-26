@@ -1,0 +1,144 @@
+profile: dev
+
+image:
+  repository: animus
+  tag: latest
+  digest: ""
+  digests: {}
+  pullPolicy: IfNotPresent
+
+auth:
+  mode: dev
+  sessionCookieSecure: false
+  internalAuthSecret: animus-internal-dev-secret-change-me
+
+oidc:
+  issuerURL: ""
+  clientID: ""
+  clientSecret: ""
+  redirectURL: ""
+  scopes: "openid profile email"
+  rolesClaim: roles
+  emailClaim: email
+  sessionCookieName: animus_session
+  sessionMaxAgeSeconds: 3600
+  sessionCookieSameSite: Lax
+
+ci:
+  webhookSecret: animus-ci-webhook-dev-secret-change-me
+
+database:
+  url: ""
+
+postgres:
+  enabled: true
+  image: postgres:14-alpine
+  port: 5432
+  user: animus
+  password: animus
+  db: animus
+  persistence:
+    enabled: true
+    size: 1Gi
+
+minio:
+  enabled: true
+  image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+  mcImage: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+  apiPort: 9000
+  consolePort: 9001
+  rootUser: animus-root
+  rootPassword: animus-root-password
+  accessKey: animus
+  secretKey: animusminio
+  endpoint: ""
+  region: us-east-1
+  useSSL: false
+  buckets:
+    datasets: datasets
+    artifacts: artifacts
+  persistence:
+    enabled: true
+    size: 5Gi
+
+migrations:
+  enabled: true
+
+services:
+  gateway:
+    port: 8080
+    serviceType: ClusterIP
+  dataset-registry:
+    port: 8081
+    serviceType: ClusterIP
+  quality:
+    port: 8082
+    serviceType: ClusterIP
+  experiments:
+    port: 8083
+    serviceType: ClusterIP
+  lineage:
+    port: 8084
+    serviceType: ClusterIP
+  audit:
+    port: 8085
+    serviceType: ClusterIP
+
+ui:
+  enabled: true
+  port: 3000
+  serviceType: ClusterIP
+  image:
+    repository: ""
+    tag: ""
+    digest: ""
+    pullPolicy: ""
+  env:
+    gatewayURL: ""
+
+console:
+  upstreamURL: ""
+  publicBaseURL: ""
+  allowedReturnToOrigins: []
+
+observability:
+  metrics:
+    enabled: true
+    path: /metrics
+  otel:
+    enabled: false
+    endpoint: ""
+    insecure: true
+    tracesExporter: otlp
+    metricsExporter: otlp
+    logsExporter: none
+    serviceNamePrefix: animus
+
+tests:
+  image:
+    repository: curlimages/curl
+    tag: "8.7.1"
+    digest: ""
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  annotations: {}
+  tls: []
+
+training:
+  executor: disabled # disabled | kubernetes | docker
+  datapilotURL: ""
+  runTokenTTL: 12h
+  syncInterval: 5s
+  k8s:
+    namespace: ""
+    jobTTLSeconds: 3600
+    jobServiceAccount: ""
+
+evaluation:
+  enabled: true
+  imageRef: ""
+  previewSamples: 16
+  syncInterval: ""

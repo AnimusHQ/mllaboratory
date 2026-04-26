@@ -1,0 +1,26 @@
+ARG GO_VERSION=1.25
+FROM golang:${GO_VERSION}@sha256:36b4f45d2874905b9e8573b783292629bcb346d0a70d8d7150b6df545234818f AS build
+
+WORKDIR /src
+
+COPY go.mod go.sum ./
+COPY vendor ./vendor
+COPY third_party ./third_party
+COPY api ./api
+COPY open ./open
+COPY closed ./closed
+
+ENV CGO_ENABLED=0
+ENV GOFLAGS=-mod=vendor
+
+ARG SERVICE
+RUN test -n "$SERVICE"
+RUN go build -trimpath -ldflags "-s -w" -o /out/app "./closed/${SERVICE}"
+
+FROM alpine:3.20@sha256:31687a2fdd021f85955bf2d0c2682e9c0949827560e1db546358ea094f740f12
+
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /out/app /bin/app
+
+USER 65532:65532
+ENTRYPOINT ["/bin/app"]

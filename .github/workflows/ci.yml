@@ -1,0 +1,210 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    env:
+      GOCACHE: ${{ runner.temp }}/go-build-cache
+      GOMODCACHE: ${{ runner.temp }}/go-mod-cache
+      GOTMPDIR: ${{ runner.temp }}/go-tmp
+      ANIMUS_CONTRACTS_DIR: core/contracts
+      ANIMUS_DEPLOY_DIR: deploy
+      ANIMUS_ENTERPRISE_SCRIPTS_DIR: enterprise/scripts
+      OPENAPI_BREAKING_ALLOW: ""
+      OPENAPI_BASELINE_UPDATE: ""
+    steps:
+      - uses: actions/checkout@v4
+      - name: detect submodule URL mode
+        id: submodule_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'url = TODO_(ENTERPRISE|SDK)_REPO_URL' .gitmodules; then
+            echo "real_urls=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "real_urls=1" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: checkout submodules (recursive)
+        if: steps.submodule_mode.outputs.real_urls == '1'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: load guardrail policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/guardrail_policy.env
+          if [[ "${{ steps.submodule_mode.outputs.real_urls }}" == "1" ]]; then
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=1" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=1" >> "${GITHUB_ENV}"
+          else
+            : "${ANIMUS_PR_SUBMODULE_ENFORCE:=0}"
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=${ANIMUS_PR_SUBMODULE_ENFORCE}" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=0" >> "${GITHUB_ENV}"
+          fi
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: make bootstrap
+      - name: install golangci-lint
+        run: |
+          mkdir -p .bin
+          GOBIN="${PWD}/.bin" go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+          echo "${PWD}/.bin" >> "${GITHUB_PATH}"
+          "${PWD}/.bin/golangci-lint" version
+      - run: make ci-baseline
+      - run: make hygiene-check
+      - run: make openapi-check
+      - run: make arch-check
+      - run: make repro-check
+      - run: make base-image-check
+      - run: make policy-validate
+      - run: make ui-build
+      - run: make ui-test
+
+  legacy-guardrails:
+    runs-on: ubuntu-latest
+    env:
+      ANIMUS_CONTRACTS_DIR: core/contracts
+      ANIMUS_DEPLOY_DIR: deploy
+      ANIMUS_ENTERPRISE_SCRIPTS_DIR: enterprise/scripts
+      ANIMUS_COMPAT_ENTERPRISE_MODE: allow_stub
+      ANIMUS_LEGACY_BYPASS: ${{ vars.ANIMUS_LEGACY_BYPASS || '' }}
+      ANIMUS_LEGACY_BYPASS_REASON: ${{ vars.ANIMUS_LEGACY_BYPASS_REASON || '' }}
+      ANIMUS_LEGACY_BYPASS_UNTIL: ${{ vars.ANIMUS_LEGACY_BYPASS_UNTIL || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: detect submodule URL mode
+        id: submodule_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'url = TODO_(ENTERPRISE|SDK)_REPO_URL' .gitmodules; then
+            echo "real_urls=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "real_urls=1" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: checkout submodules (recursive)
+        if: steps.submodule_mode.outputs.real_urls == '1'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: load guardrail policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/guardrail_policy.env
+          : "${ANIMUS_PR_LEGACY_ENFORCE:=0}"
+          echo "ANIMUS_PR_LEGACY_ENFORCE=${ANIMUS_PR_LEGACY_ENFORCE}" >> "${GITHUB_ENV}"
+          if [[ "${{ steps.submodule_mode.outputs.real_urls }}" == "1" ]]; then
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=1" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=1" >> "${GITHUB_ENV}"
+          else
+            : "${ANIMUS_PR_SUBMODULE_ENFORCE:=0}"
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=${ANIMUS_PR_SUBMODULE_ENFORCE}" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=0" >> "${GITHUB_ENV}"
+          fi
+      - name: submodule-check (visibility + optional enforce)
+        run: make submodule-check
+      - name: compat-check
+        run: make compat-check
+      - name: legacy-scan (visibility + optional enforce)
+        shell: bash
+        run: |
+          set -euo pipefail
+          make legacy-scan
+
+          if [[ "${ANIMUS_LEGACY_BYPASS:-0}" == "1" ]]; then
+            if [[ -z "${ANIMUS_LEGACY_BYPASS_REASON:-}" ]]; then
+              echo "legacy-guardrails: ANIMUS_LEGACY_BYPASS_REASON is required when bypass is enabled" >&2
+              exit 1
+            fi
+            if [[ -z "${ANIMUS_LEGACY_BYPASS_UNTIL:-}" ]]; then
+              echo "legacy-guardrails: ANIMUS_LEGACY_BYPASS_UNTIL is required when bypass is enabled" >&2
+              exit 1
+            fi
+
+            now_epoch="$(date -u +%s)"
+            until_epoch="$(date -u -d "${ANIMUS_LEGACY_BYPASS_UNTIL}" +%s 2>/dev/null || true)"
+            if [[ -z "${until_epoch}" ]]; then
+              echo "legacy-guardrails: ANIMUS_LEGACY_BYPASS_UNTIL must be an ISO-8601 date" >&2
+              exit 1
+            fi
+
+            max_epoch="$(date -u -d '+7 days' +%s)"
+            if (( until_epoch <= now_epoch )); then
+              echo "legacy-guardrails: bypass date must be in the future: ${ANIMUS_LEGACY_BYPASS_UNTIL}" >&2
+              exit 1
+            fi
+            if (( until_epoch > max_epoch )); then
+              echo "legacy-guardrails: bypass window cannot exceed 7 days: ${ANIMUS_LEGACY_BYPASS_UNTIL}" >&2
+              exit 1
+            fi
+
+            echo "::warning::LEGACY BYPASS ENABLED until ${ANIMUS_LEGACY_BYPASS_UNTIL}; reason: ${ANIMUS_LEGACY_BYPASS_REASON}"
+            echo "::warning::legacy fail-mode enforcement skipped for this run"
+            exit 0
+          fi
+
+          if [[ "${ANIMUS_PR_LEGACY_ENFORCE:-0}" == "1" ]]; then
+            echo "legacy-guardrails: fail-mode enforcement enabled by policy"
+            ANIMUS_LEGACY_SCAN_FAIL=1 make legacy-scan
+          else
+            echo "legacy-guardrails: fail-mode enforcement disabled by policy"
+          fi
+
+  supply-chain:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    env:
+      GOCACHE: ${{ runner.temp }}/go-build-cache
+      GOMODCACHE: ${{ runner.temp }}/go-mod-cache
+      GOTMPDIR: ${{ runner.temp }}/go-tmp
+      VULN_FAIL_ON: ""
+      ANIMUS_INSTALL_TOOLS: "1"
+      ANIMUS_CONTRACTS_DIR: core/contracts
+      ANIMUS_DEPLOY_DIR: deploy
+      ANIMUS_ENTERPRISE_SCRIPTS_DIR: enterprise/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make supply-chain
+      - name: upload supply-chain reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: supply-chain-reports
+          path: .cache/supply-chain
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: lint-test
+    env:
+      GOCACHE: ${{ runner.temp }}/go-build-cache
+      GOMODCACHE: ${{ runner.temp }}/go-mod-cache
+      GOTMPDIR: ${{ runner.temp }}/go-tmp
+      ANIMUS_CONTRACTS_DIR: core/contracts
+      ANIMUS_DEPLOY_DIR: deploy
+      ANIMUS_ENTERPRISE_SCRIPTS_DIR: enterprise/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - run: make e2e

@@ -1,0 +1,7 @@
+apiVersion: v2
+name: animus-datapilot
+description: Animus DataPilot (enterprise pilot) services
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+

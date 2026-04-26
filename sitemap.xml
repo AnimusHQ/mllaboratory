@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/README.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/docs/quickstart.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/docs/faq.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/docs/comparison.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/SECURITY.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/CONTRIBUTING.md</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/docs/ai/llms.txt</loc>
+  </url>
+  <url>
+    <loc>https://github.com/AnimusHQ/mllaboratory/blob/main/docs/ai/llms-full.txt</loc>
+  </url>
+</urlset>

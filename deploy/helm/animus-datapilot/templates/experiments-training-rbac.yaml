@@ -1,0 +1,40 @@
+{{- $trainingExecutor := lower (default "disabled" .Values.training.executor) -}}
+{{- if or (eq $trainingExecutor "kubernetes") (eq $trainingExecutor "k8s") }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-experiments
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: experiments
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-experiments-training
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: experiments
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-experiments-training
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: experiments
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "animus-datapilot.fullname" . }}-experiments
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "animus-datapilot.fullname" . }}-experiments-training
+{{- end }}

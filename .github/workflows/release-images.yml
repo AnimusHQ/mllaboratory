@@ -1,0 +1,163 @@
+name: release-images
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      image_repo:
+        description: "Image repository prefix (example: ghcr.io/org/animus)"
+        required: false
+        type: string
+      image_tag:
+        description: "Image tag override"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+jobs:
+  release-images:
+    runs-on: ubuntu-latest
+    env:
+      ANIMUS_IMAGE_PLATFORM: linux/amd64
+      ANIMUS_BUILD_UI: "1"
+      SYFT_VERSION: v0.103.1
+      COSIGN_VERSION: v2.4.1
+      SUPPLY_CHAIN_OUT: ${{ github.workspace }}/artifacts
+      ANIMUS_CONTRACTS_DIR: core/contracts
+      ANIMUS_DEPLOY_DIR: deploy
+      ANIMUS_ENTERPRISE_SCRIPTS_DIR: enterprise/scripts
+    steps:
+      - uses: actions/checkout@v4
+      - name: detect submodule URL mode
+        id: submodule_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'url = TODO_(ENTERPRISE|SDK)_REPO_URL' .gitmodules; then
+            echo "real_urls=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "real_urls=1" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: checkout submodules (recursive)
+        if: steps.submodule_mode.outputs.real_urls == '1'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: load guardrail policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/guardrail_policy.env
+          if [[ "${{ steps.submodule_mode.outputs.real_urls }}" == "1" ]]; then
+            : "${ANIMUS_RELEASE_SUBMODULE_ENFORCE:=1}"
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=${ANIMUS_RELEASE_SUBMODULE_ENFORCE}" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=1" >> "${GITHUB_ENV}"
+          else
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=0" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=0" >> "${GITHUB_ENV}"
+          fi
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: submodule-check (enforced)
+        run: make submodule-check
+
+      - name: enforce canonical path compatibility
+        env:
+          ANIMUS_COMPAT_ENTERPRISE_MODE: allow_stub
+        run: make compat-check
+
+      - uses: docker/setup-buildx-action@v3
+        with:
+          version: v0.21.1
+
+      - name: resolve release variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo_input="${{ inputs.image_repo || '' }}"
+          tag_input="${{ inputs.image_tag || '' }}"
+          if [[ -n "${repo_input}" ]]; then
+            image_repo="${repo_input}"
+          else
+            image_repo="ghcr.io/${GITHUB_REPOSITORY_OWNER}/animus"
+          fi
+          if [[ -n "${tag_input}" ]]; then
+            image_tag="${tag_input}"
+          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            image_tag="${GITHUB_REF_NAME}"
+          else
+            image_tag="${GITHUB_SHA::12}"
+          fi
+          echo "ANIMUS_IMAGE_REPO=${image_repo}" >> "${GITHUB_ENV}"
+          echo "ANIMUS_IMAGE_TAG=${image_tag}" >> "${GITHUB_ENV}"
+          echo "ANIMUS_VERSION=${image_tag}" >> "${GITHUB_ENV}"
+          echo "ANIMUS_IMAGES_JSON=${GITHUB_WORKSPACE}/artifacts/images.json" >> "${GITHUB_ENV}"
+          echo "ANIMUS_CP_VALUES_OUT=${GITHUB_WORKSPACE}/artifacts/helm/animus-datapilot-values-production.generated.yaml" >> "${GITHUB_ENV}"
+          echo "ANIMUS_DP_VALUES_OUT=${GITHUB_WORKSPACE}/artifacts/helm/animus-dataplane-values-production.generated.yaml" >> "${GITHUB_ENV}"
+
+      - name: login ghcr
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: build deterministic images and capture digests
+        run: |
+          ANIMUS_IMAGE_PUSH=1 make images-build
+
+      - name: install syft
+        run: |
+          mkdir -p .bin
+          GOBIN="${PWD}/.bin" go install github.com/anchore/syft/cmd/syft@${SYFT_VERSION}
+          echo "${PWD}/.bin" >> "${GITHUB_PATH}"
+          "${PWD}/.bin/syft" version
+
+      - name: generate sbom
+        run: make sbom
+
+      - name: verify sbom
+        run: make sbom-check
+
+      - name: install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: v2.4.1
+
+      - name: sign images + attest provenance
+        run: make sign-images
+
+      - name: verify signatures + attestations
+        env:
+          COSIGN_CERT_IDENTITY_REGEXP: '^https://github.com/${{ github.repository }}/.github/workflows/release-images.yml@refs/.*$'
+          COSIGN_CERT_OIDC_ISSUER: https://token.actions.githubusercontent.com
+        run: make verify-images
+
+      - name: verify reproducibility policy
+        env:
+          ANIMUS_PROD_VALUES_CP: ${{ env.ANIMUS_CP_VALUES_OUT }}
+          ANIMUS_PROD_VALUES_DP: ${{ env.ANIMUS_DP_VALUES_OUT }}
+          ANIMUS_REPRO_REQUIRE_MANIFEST_MATCH: "1"
+        run: make repro-check
+
+      - name: upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-supply-chain-artifacts
+          path: |
+            artifacts/images.json
+            artifacts/images.txt
+            artifacts/sbom/
+            artifacts/attestations/
+            artifacts/helm/

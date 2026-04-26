@@ -1,0 +1,54 @@
+name: nightly-guardrails
+
+on:
+  schedule:
+    - cron: "21 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-enforcement:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: detect submodule URL mode
+        id: submodule_mode
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -Eq 'url = TODO_(ENTERPRISE|SDK)_REPO_URL' .gitmodules; then
+            echo "real_urls=0" >> "${GITHUB_OUTPUT}"
+          else
+            echo "real_urls=1" >> "${GITHUB_OUTPUT}"
+          fi
+      - name: checkout submodules (recursive)
+        if: steps.submodule_mode.outputs.real_urls == '1'
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: load guardrail policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck source=/dev/null
+          source scripts/guardrail_policy.env
+          : "${ANIMUS_NIGHTLY_LEGACY_ENFORCE:=1}"
+          echo "ANIMUS_LEGACY_SCAN_FAIL=${ANIMUS_NIGHTLY_LEGACY_ENFORCE}" >> "${GITHUB_ENV}"
+          if [[ "${{ steps.submodule_mode.outputs.real_urls }}" == "1" ]]; then
+            : "${ANIMUS_NIGHTLY_SUBMODULE_ENFORCE:=1}"
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=${ANIMUS_NIGHTLY_SUBMODULE_ENFORCE}" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=1" >> "${GITHUB_ENV}"
+          else
+            echo "ANIMUS_SUBMODULE_CHECK_ENFORCE=0" >> "${GITHUB_ENV}"
+            echo "ANIMUS_SUBMODULE_CHECK_REQUIRE_INIT=0" >> "${GITHUB_ENV}"
+          fi
+      - name: submodule-check (enforced)
+        run: make submodule-check
+      - name: compat-check
+        env:
+          ANIMUS_COMPAT_ENTERPRISE_MODE: allow_stub
+        run: make compat-check
+      - name: legacy-scan (fail mode)
+        run: make legacy-scan

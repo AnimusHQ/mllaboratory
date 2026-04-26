@@ -1,0 +1,254 @@
+$schema: https://json-schema.org/draft/2020-12/schema
+$id: https://animus.dev/schemas/pipeline_spec.json
+title: Animus PipelineSpec
+type: object
+additionalProperties: false
+required:
+  - apiVersion
+  - kind
+  - specVersion
+  - spec
+properties:
+  apiVersion:
+    type: string
+    minLength: 1
+    description: Versioned API identifier for the PipelineSpec contract.
+  kind:
+    type: string
+    enum:
+      - Pipeline
+  specVersion:
+    type: string
+    minLength: 1
+    description: Version of the PipelineSpec schema (independent from apiVersion).
+  metadata:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+    properties:
+      name:
+        type: string
+        minLength: 1
+      description:
+        type: string
+      labels:
+        type: object
+        additionalProperties:
+          type: string
+  spec:
+    type: object
+    additionalProperties: false
+    required:
+      - steps
+      - dependencies
+    properties:
+      steps:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/step"
+      dependencies:
+        type: array
+        items:
+          $ref: "#/$defs/dependency"
+$defs:
+  dependency:
+    type: object
+    additionalProperties: false
+    required:
+      - from
+      - to
+    properties:
+      from:
+        type: string
+        minLength: 1
+      to:
+        type: string
+        minLength: 1
+  step:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - image
+      - command
+      - args
+      - inputs
+      - outputs
+      - env
+      - resources
+      - retryPolicy
+    properties:
+      name:
+        type: string
+        minLength: 1
+      image:
+        type: string
+        minLength: 1
+        pattern: "^.+@sha256:[a-f0-9]{64}$"
+        description: Container image reference pinned by digest (no tags).
+      command:
+        type: array
+        items:
+          type: string
+        description: Entry command array (explicit, no defaults).
+      args:
+        type: array
+        items:
+          type: string
+        description: Argument array (explicit, no defaults).
+      inputs:
+        $ref: "#/$defs/stepInputs"
+      outputs:
+        $ref: "#/$defs/stepOutputs"
+      env:
+        type: array
+        items:
+          $ref: "#/$defs/envVar"
+      resources:
+        $ref: "#/$defs/resources"
+      retryPolicy:
+        $ref: "#/$defs/retryPolicy"
+  stepInputs:
+    type: object
+    additionalProperties: false
+    required:
+      - datasets
+      - artifacts
+    properties:
+      datasets:
+        type: array
+        items:
+          $ref: "#/$defs/datasetInput"
+      artifacts:
+        type: array
+        items:
+          $ref: "#/$defs/artifactInput"
+  stepOutputs:
+    type: object
+    additionalProperties: false
+    required:
+      - artifacts
+    properties:
+      artifacts:
+        type: array
+        items:
+          $ref: "#/$defs/artifactOutput"
+  datasetInput:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - datasetRef
+    properties:
+      name:
+        type: string
+        minLength: 1
+      datasetRef:
+        type: string
+        minLength: 1
+        description: Logical dataset alias to be bound in RunSpec; not a version.
+  artifactInput:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - fromStep
+      - artifact
+    properties:
+      name:
+        type: string
+        minLength: 1
+      fromStep:
+        type: string
+        minLength: 1
+      artifact:
+        type: string
+        minLength: 1
+  artifactOutput:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - type
+    properties:
+      name:
+        type: string
+        minLength: 1
+      type:
+        type: string
+        minLength: 1
+      mediaType:
+        type: string
+        minLength: 1
+      description:
+        type: string
+  envVar:
+    type: object
+    additionalProperties: false
+    required:
+      - name
+      - value
+    properties:
+      name:
+        type: string
+        minLength: 1
+      value:
+        type: string
+  resources:
+    type: object
+    additionalProperties: false
+    required:
+      - cpu
+      - memory
+      - gpu
+    properties:
+      cpu:
+        type: string
+        minLength: 1
+        description: >-
+          CPU request, explicit and unit-bearing (ex: "500m", "2").
+      memory:
+        type: string
+        minLength: 1
+        description: >-
+          Memory request, explicit and unit-bearing (ex: "4Gi").
+      gpu:
+        type: integer
+        minimum: 0
+  retryPolicy:
+    type: object
+    additionalProperties: false
+    required:
+      - maxAttempts
+      - backoff
+    properties:
+      maxAttempts:
+        type: integer
+        minimum: 1
+      backoff:
+        $ref: "#/$defs/backoff"
+  backoff:
+    type: object
+    additionalProperties: false
+    required:
+      - type
+      - initialSeconds
+      - maxSeconds
+      - multiplier
+    properties:
+      type:
+        type: string
+        enum:
+          - fixed
+          - exponential
+      initialSeconds:
+        type: integer
+        minimum: 0
+      maxSeconds:
+        type: integer
+        minimum: 0
+      multiplier:
+        type: number
+        minimum: 1

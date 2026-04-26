@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "animus-dataplane.fullname" . }}
+  labels:
+    {{- include "animus-dataplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: dataplane
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: dataplane
+  template:
+    metadata:
+      labels:
+        {{- include "animus-dataplane.labels" . | nindent 8 }}
+        app.kubernetes.io/component: dataplane
+    spec:
+      {{- if .Values.k8s.rbac.create }}
+      serviceAccountName: {{ include "animus-dataplane.fullname" . }}-dp
+      {{- end }}
+      containers:
+        - name: dataplane
+          image: {{ include "animus-dataplane.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: DATAPLANE_HTTP_ADDR
+              value: {{ printf "0.0.0.0:%d" (.Values.service.port | int) | quote }}
+            - name: ANIMUS_INTERNAL_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-dataplane.secretsName" . }}
+                  key: internalAuthSecret
+            - name: ANIMUS_CONTROL_PLANE_URL
+              value: {{ required "controlPlane.baseURL is required" .Values.controlPlane.baseURL | quote }}
+            - name: ANIMUS_DATAPLANE_K8S_NAMESPACE
+              value: {{ .Values.k8s.namespace | default .Release.Namespace | quote }}
+            - name: ANIMUS_DATAPLANE_JOB_TTL_SECONDS
+              value: {{ .Values.k8s.jobTTLSeconds | quote }}
+            {{- if .Values.k8s.jobServiceAccount }}
+            - name: ANIMUS_DATAPLANE_JOB_SERVICE_ACCOUNT
+              value: {{ .Values.k8s.jobServiceAccount | quote }}
+            {{- end }}
+            - name: ANIMUS_DATAPLANE_HEARTBEAT_INTERVAL
+              value: {{ .Values.runtime.heartbeatInterval | quote }}
+            - name: ANIMUS_DATAPLANE_STATUS_POLL_INTERVAL
+              value: {{ .Values.runtime.statusPollInterval | quote }}
+            - name: AUTH_RBAC_ALLOW_DIRECT_ROLES
+              value: {{ .Values.auth.allowDirectRoles | quote }}
+            - name: SECRETS_PROVIDER
+              value: {{ .Values.secrets.provider | quote }}
+            - name: SECRETS_LEASE_TTL_SECONDS
+              value: {{ .Values.secrets.leaseTTLSeconds | quote }}
+            {{- if .Values.secrets.staticJSON }}
+            - name: SECRETS_STATIC_JSON
+              value: {{ .Values.secrets.staticJSON | quote }}
+            {{- end }}
+            {{- if or (eq .Values.secrets.provider "vault_k8s") (eq .Values.secrets.provider "vault") }}
+            {{- if .Values.secrets.vault.addr }}
+            - name: SECRETS_VAULT_ADDR
+              value: {{ .Values.secrets.vault.addr | quote }}
+            {{- end }}
+            {{- if .Values.secrets.vault.role }}
+            - name: SECRETS_VAULT_ROLE
+              value: {{ .Values.secrets.vault.role | quote }}
+            {{- end }}
+            {{- if .Values.secrets.vault.authPath }}
+            - name: SECRETS_VAULT_AUTH_PATH
+              value: {{ .Values.secrets.vault.authPath | quote }}
+            {{- end }}
+            {{- if .Values.secrets.vault.jwtPath }}
+            - name: SECRETS_VAULT_JWT_PATH
+              value: {{ .Values.secrets.vault.jwtPath | quote }}
+            {{- end }}
+            {{- if .Values.secrets.vault.namespace }}
+            - name: SECRETS_VAULT_NAMESPACE
+              value: {{ .Values.secrets.vault.namespace | quote }}
+            {{- end }}
+            {{- if .Values.secrets.vault.timeout }}
+            - name: SECRETS_VAULT_TIMEOUT
+              value: {{ .Values.secrets.vault.timeout | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.observability.otel.enabled }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.observability.otel.endpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_INSECURE
+              value: {{ .Values.observability.otel.insecure | quote }}
+            - name: OTEL_TRACES_EXPORTER
+              value: {{ .Values.observability.otel.tracesExporter | quote }}
+            - name: OTEL_METRICS_EXPORTER
+              value: {{ .Values.observability.otel.metricsExporter | quote }}
+            - name: OTEL_LOGS_EXPORTER
+              value: {{ .Values.observability.otel.logsExporter | quote }}
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.observability.otel.serviceName | quote }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http

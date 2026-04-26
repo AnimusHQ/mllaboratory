@@ -1,0 +1,65 @@
+{{- if .Values.minio.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "animus-datapilot.fullname" . }}-minio-init
+  labels:
+    {{- include "animus-datapilot.labels" . | nindent 4 }}
+    app.kubernetes.io/component: minio-init
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        {{- include "animus-datapilot.labels" . | nindent 8 }}
+        app.kubernetes.io/component: minio-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: minio-init
+          image: {{ .Values.minio.mcImage | quote }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: MINIO_ROOT_USER
+              value: {{ .Values.minio.rootUser | quote }}
+            - name: MINIO_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" . }}
+                  key: minioRootPassword
+            - name: ANIMUS_MINIO_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" . }}
+                  key: minioAccessKey
+            - name: ANIMUS_MINIO_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "animus-datapilot.secretsName" . }}
+                  key: minioSecretKey
+            - name: BUCKET_DATASETS
+              value: {{ .Values.minio.buckets.datasets | quote }}
+            - name: BUCKET_ARTIFACTS
+              value: {{ .Values.minio.buckets.artifacts | quote }}
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail;
+              endpoint="http://{{ include "animus-datapilot.minio.serviceName" . }}:{{ .Values.minio.apiPort }}";
+              for i in $(seq 1 60); do
+                mc alias set animus "${endpoint}" "${MINIO_ROOT_USER}" "${MINIO_ROOT_PASSWORD}" && break;
+                sleep 2;
+              done;
+              mc mb -p "animus/${BUCKET_DATASETS}" || true;
+              mc mb -p "animus/${BUCKET_ARTIFACTS}" || true;
+              cat > /tmp/animus-rw.json <<EOF
+              {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket"],"Resource":["arn:aws:s3:::${BUCKET_DATASETS}","arn:aws:s3:::${BUCKET_ARTIFACTS}"]},{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:DeleteObject"],"Resource":["arn:aws:s3:::${BUCKET_DATASETS}/*","arn:aws:s3:::${BUCKET_ARTIFACTS}/*"]}]}
+              EOF
+              mc admin user add animus "${ANIMUS_MINIO_ACCESS_KEY}" "${ANIMUS_MINIO_SECRET_KEY}" || true;
+              mc admin policy create animus animus-rw /tmp/animus-rw.json || mc admin policy info animus animus-rw >/dev/null 2>&1;
+              mc admin policy attach animus animus-rw --user "${ANIMUS_MINIO_ACCESS_KEY}" || true;
+              echo "minio buckets ensured";
+{{- end }}

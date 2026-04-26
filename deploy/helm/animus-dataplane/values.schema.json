@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "service", "auth", "controlPlane", "k8s", "runtime", "secrets"],
+  "properties": {
+    "nameOverride": {"type": "string"},
+    "fullnameOverride": {"type": "string"},
+    "profile": {
+      "type": "string",
+      "enum": ["dev", "production"]
+    },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "tag", "pullPolicy"],
+      "properties": {
+        "repository": {"type": "string", "minLength": 1},
+        "tag": {"type": "string"},
+        "digest": {"type": "string"},
+        "pullPolicy": {"type": "string"}
+      }
+    },
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["port"],
+      "properties": {
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "serviceType": {"type": "string"}
+      }
+    },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["internalAuthSecret"],
+      "properties": {
+        "internalAuthSecret": {"type": "string", "minLength": 1},
+        "allowDirectRoles": {"type": "boolean"}
+      }
+    },
+    "controlPlane": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseURL"],
+      "properties": {
+        "baseURL": {"type": "string", "minLength": 1}
+      }
+    },
+    "k8s": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["jobTTLSeconds", "rbac"],
+      "properties": {
+        "namespace": {"type": "string"},
+        "jobTTLSeconds": {"type": "integer", "minimum": 1},
+        "jobServiceAccount": {"type": "string"},
+        "rbac": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "create": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "heartbeatInterval": {"type": "string"},
+        "statusPollInterval": {"type": "string"}
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": {"type": "string"},
+        "leaseTTLSeconds": {"type": "integer", "minimum": 1},
+        "staticJSON": {"type": "string"},
+        "vault": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "addr": {"type": "string"},
+            "role": {"type": "string"},
+            "authPath": {"type": "string"},
+            "jwtPath": {"type": "string"},
+            "namespace": {"type": "string"},
+            "timeout": {"type": "string"}
+          }
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "path": {"type": "string"}
+          }
+        },
+        "otel": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "endpoint": {"type": "string"},
+            "insecure": {"type": "boolean"},
+            "tracesExporter": {"type": "string"},
+            "metricsExporter": {"type": "string"},
+            "logsExporter": {"type": "string"},
+            "serviceName": {"type": "string"}
+          }
+        }
+      }
+    },
+    "tests": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "repository": {"type": "string"},
+            "tag": {"type": "string"},
+            "digest": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

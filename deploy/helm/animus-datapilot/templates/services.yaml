@@ -1,0 +1,26 @@
+{{- range $name, $svc := .Values.services }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "animus-datapilot.fullname" $ }}-{{ $name }}
+  labels:
+    {{- include "animus-datapilot.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $name }}
+  {{- if $.Values.observability.metrics.enabled }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: {{ $.Values.observability.metrics.path | quote }}
+    prometheus.io/port: {{ $svc.port | quote }}
+  {{- end }}
+spec:
+  type: {{ $svc.serviceType | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: {{ $name }}
+  ports:
+    - name: http
+      port: {{ $svc.port }}
+      targetPort: http
+      protocol: TCP
+---
+{{- end }}

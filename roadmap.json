@@ -1,0 +1,1322 @@
+{
+  "meta": {
+    "name": "Animus Datalab - Production-Grade Roadmap (Implementation-Executable)",
+    "roadmap_version": 3,
+    "version": "1.0.0",
+    "generated_at": "2026-02-01",
+    "timezone": "Europe/Helsinki",
+    "scope": "Full implementation to production-grade per consolidated spec: CP/DP split, reproducibility, audit, security, operability, acceptance.",
+    "target_release": "v1.0.0-production-grade",
+    "principles": [
+      "Control Plane never executes user code",
+      "Run is the minimal unit of reproducibility and audit",
+      "Production-run requires DatasetVersion + commit_sha + EnvironmentLock + parameters + policy_snapshot",
+      "Audit is append-only and non-disableable",
+      "Deny-by-default security posture; explicit allowlists",
+      "No hidden state; all dependencies explicit and versioned"
+    ]
+  },
+
+  "production_grade_target": {
+    "definition": "Platform can replace current ML tooling with deterministic, auditable, secure, operable workflows end-to-end within a single Project.",
+    "final_gate_milestone": "M9",
+    "acceptance_criteria": [
+      "End-to-end ML lifecycle runs within a Project without external stitching",
+      "Any production-run reproducible from DatasetVersion + commit_sha + EnvironmentLock (+ params + policy snapshot)",
+      "All state-changing actions audited, append-only, exportable (project-scoped; system-scoped where applicable)",
+      "SSO + RBAC enforced end-to-end; object-level authorization on sensitive reads/downloads/exports",
+      "Install/upgrade/rollback automated and documented (Helm/Kustomize)",
+      "No implicit state; every result explainable via domain graph (lineage + audit + artifacts)",
+      "HA control plane, observability, backup/DR validated; runbooks executed successfully in drills"
+    ]
+  },
+
+  "global_assumptions": {
+    "runtime": "Kubernetes",
+    "storage": "S3-compatible object storage",
+    "identity": "OIDC (primary) and/or SAML via enterprise IdP",
+    "secrets": "Vault-like secrets manager with short-lived credentials",
+    "observability": "Prometheus + OpenTelemetry + structured logs",
+    "delivery": "Helm charts (preferred) and/or Kustomize",
+    "metadata_db": "PostgreSQL (external supported)"
+  },
+
+  "invariants": {
+    "planes": {
+      "control_plane": {
+        "must_not": [
+          "execute user code",
+          "mount user volumes for execution",
+          "access plaintext secrets",
+          "store opaque mutable state without audit trail"
+        ],
+        "must": [
+          "validate specs",
+          "persist immutable metadata",
+          "enforce authn/authz",
+          "emit mandatory audit events",
+          "schedule and reconcile desired state"
+        ]
+      },
+      "data_plane": {
+        "must": [
+          "execute user workloads in isolated K8s workloads",
+          "handle secrets injection only at execution time",
+          "write artifacts to object storage with checksums",
+          "report heartbeats and terminal states to CP",
+          "expose run-scoped telemetry (logs/metrics/traces)"
+        ]
+      }
+    },
+    "reproducibility": {
+      "production_run_requirements": [
+        "DatasetVersionId (immutable)",
+        "CodeRef(commit_sha + repo_url; immutable for the run)",
+        "EnvironmentLock (immutable; image digests pinned; SBOM refs if available)",
+        "parameters (explicit)",
+        "policy_snapshot (RBAC + retention + network policy + template restrictions at time of run)"
+      ],
+      "determinism": [
+        "plan_hash deterministic from (pipeline_spec_hash + bindings + run_spec + retry policy)",
+        "stable topological ordering with tie-breaker rules",
+        "idempotent create operations produce identical resource on duplicate requests"
+      ]
+    },
+    "audit": {
+      "append_only": true,
+      "non_disableable": true,
+      "exportable": true,
+      "coverage": [
+        "all state-changing operations",
+        "all access to protected downloads/exports",
+        "authn events (login/logout/session expiry)",
+        "privilege changes (role bindings)",
+        "secrets access events (metadata only, never values)"
+      ]
+    }
+  },
+
+  "current_state": {
+    "as_of": "2026-02-01",
+    "implementation_root": "closed/",
+    "completed": {
+      "milestones": ["M0", "M1", "M7", "M8"],
+      "capabilities": [
+        "CP/DP boundary guardrails (depguard) and ADRs",
+        "Project scoping middleware and enforcement for key services",
+        "Dataset/DatasetVersion persistence with immutability triggers",
+        "Artifacts: presigned URLs + retention metadata + project scoping",
+        "Audit store append-only + NDJSON HTTP export MVP",
+        "RunSpec/PipelineSpec validator, deterministic planner, dry-run executor, derived run state APIs"
+      ]
+    },
+    "in_progress": {
+      "milestones": ["M2", "M5"]
+    },
+    "gaps_blocking_production_grade": [
+      "Real DP runtime executor (Kubernetes) and CP<->DP execution protocol",
+      "Scheduling/queues/quotas and cancellation end-to-end",
+      "Secrets TTL integration + redaction pipeline",
+      "Full observability, HA, backups/DR, packaging, air-gapped/SBOM gates",
+      "Automated E2E acceptance in CI"
+    ],
+    "code_anchors": {
+      "domain": "closed/internal/domain/",
+      "repos": "closed/internal/repo/postgres/",
+      "dataset_registry": "closed/dataset-registry/",
+      "experiments_runs": "closed/experiments/",
+      "audit": "closed/audit/",
+      "object_store": "closed/internal/storage/objectstore/",
+      "artifacts_service": "closed/internal/service/artifacts/",
+      "migrations": "closed/migrations/"
+    }
+  },
+
+  "naming_conventions": {
+    "id_prefixes": {
+      "milestone": "M",
+      "epic": "E",
+      "task": "T",
+      "api_contract": "C",
+      "event_contract": "EV",
+      "schema": "S"
+    },
+    "idempotency": {
+      "header": "Idempotency-Key",
+      "semantics": "Create endpoints MUST be idempotent within a bounded retention window; duplicates return the original resource."
+    }
+  },
+
+  "contracts": {
+    "api_surface": {
+      "style": "OpenAPI-first (YAML) with strict linting + generated clients/stubs where applicable",
+      "versioning": "SemVer + explicit /v1 paths; breaking changes require new major",
+      "error_model": {
+        "shape": "problem+json-like",
+        "fields": ["code", "message", "request_id", "details", "retryable"],
+        "codes": [
+          "AUTH_REQUIRED",
+          "FORBIDDEN",
+          "NOT_FOUND",
+          "CONFLICT",
+          "VALIDATION_FAILED",
+          "QUOTA_EXCEEDED",
+          "PRECONDITION_FAILED",
+          "INTERNAL",
+          "UPSTREAM_UNAVAILABLE"
+        ]
+      }
+    },
+    "cp_dp_protocol": {
+      "transport": "HTTP/gRPC internal (choose one and freeze by M3-Design)",
+      "required_messages": [
+        "RunExecutionRequest",
+        "RunHeartbeat",
+        "RunTerminalState",
+        "ArtifactCommitted",
+        "LogCursorUpdate (optional)",
+        "DevEnvSessionHeartbeat (if dev env enabled)"
+      ],
+      "idempotency": "All DP->CP reports MUST be idempotent; CP must accept safe duplicates."
+    }
+  },
+
+  "milestones": [
+    {
+      "id": "M0",
+      "name": "Foundations & Architecture Baseline",
+      "status": "done",
+      "depends_on": [],
+      "objective": "Lock CP/DP boundary, repo boundaries, Kubernetes baseline notes, object storage abstraction, basic docs hygiene.",
+      "exit_criteria": [
+        "CP never executes user code (guardrails + ADR)",
+        "Project isolation boundary documented and enforced by design",
+        "Kubernetes baseline documented (air-gapped readiness notes)",
+        "Object storage abstraction exists"
+      ],
+      "epics": ["E00", "E01", "E09"]
+    },
+
+    {
+      "id": "M1",
+      "name": "Domain Model & Metadata Core",
+      "status": "done",
+      "depends_on": ["M0"],
+      "objective": "Persist core domain entities with strict invariants; audit skeleton; artifacts plumbing.",
+      "exit_criteria": [
+        "Project/Dataset/DatasetVersion/Artifact/AuditEvent persisted; project-scoped queries",
+        "Immutability enforced for DatasetVersion; audit append-only",
+        "Artifact upload/download mediated and audited (at least MVP)",
+        "Audit export MVP exists (NDJSON HTTP streaming)"
+      ],
+      "epics": ["E02", "E03", "E07", "E11"]
+    },
+
+    {
+      "id": "M2",
+      "name": "Execution Contracts, Runs & Deterministic Planning",
+      "status": "in_progress",
+      "depends_on": ["M1"],
+      "objective": "Finalize run/pipeline specs, deterministic plan+hashing, run state machine, and prepare execution dispatch contract for DP runtime.",
+      "exit_criteria": [
+        "PipelineSpec v1 validated and stored; strict validators with tests",
+        "RunSpec binds datasetRef->datasetVersionId + commit_sha + envLock; validators enforce production-run gate",
+        "Runs and plans persisted immutably; plan_hash stable; derived run state consistent",
+        "Dry-run executor deterministic; step attempts persisted append-only"
+      ],
+      "epics": ["E04-Design", "E05-Prep", "E08-Design"]
+    },
+
+    {
+      "id": "M3",
+      "name": "Data Plane Runtime & Real Execution (Kubernetes)",
+      "status": "not_started",
+      "depends_on": ["M2"],
+      "objective": "Implement DP executor for real workloads on Kubernetes; CP<->DP protocol; reconciliation and artifacts commit.",
+      "exit_criteria": [
+        "DP launches K8s workloads for Run with limits, isolation, and network policy",
+        "DP reports heartbeats and terminal states; CP reflects consistent run state",
+        "Artifacts written with checksums and committed semantics; CP mediates access",
+        "Reconciliation resolves orphaned/unknown runs; no manual status edits"
+      ],
+      "epics": ["E04", "E05", "E07"]
+    },
+
+    {
+      "id": "M4",
+      "name": "Scheduling, Queues, Quotas, Cancellation",
+      "status": "not_started",
+      "depends_on": ["M3"],
+      "objective": "Production-grade scheduling in CP: queues, priorities, quotas, retries/backoff, cancellation semantics end-to-end.",
+      "exit_criteria": [
+        "Queueing fairness and project quotas enforced; clear errors",
+        "Retry/backoff implemented; retries link to original run; idempotent behavior",
+        "Cancellation propagates CP->DP; terminal states consistent; audit recorded",
+        "No implicit state: scheduler decisions auditable and reproducible"
+      ],
+      "epics": ["E05"]
+    },
+
+    {
+      "id": "M5",
+      "name": "Security & Governance Hardening",
+      "status": "in_progress",
+      "depends_on": ["M3"],
+      "objective": "SSO, RBAC matrix enforcement, secrets TTL, deny-by-default egress, audit export to SIEM, retention policies.",
+      "exit_criteria": [
+        "OIDC (and optional SAML) works end-to-end; session TTL/forced logout",
+        "RBAC matrix enforced on all endpoints; object-level authz where required",
+        "Secrets manager integrated; TTL injection at execution time; redaction pipeline",
+        "Audit export SIEM-grade (webhook/syslog) with retries and idempotency",
+        "Retention + legal hold enforced for datasets/artifacts"
+      ],
+      "epics": ["E06", "E10", "E11", "E18"]
+    },
+
+    {
+      "id": "M6",
+      "name": "Pipelines (DAG) & Orchestration",
+      "status": "not_started",
+      "depends_on": ["M4"],
+      "objective": "PipelineRun orchestration with node runs, retries/backoff, partial failure policies, graph query APIs.",
+      "exit_criteria": [
+        "PipelineRun creates node-runs and dependency graph; statuses tracked",
+        "DAG execution engine dispatches to DP; retry/backoff per node",
+        "Graph query APIs available; UI can consume later",
+        "All pipeline transitions audited"
+      ],
+      "epics": ["E08", "E05"]
+    },
+
+    {
+      "id": "M7",
+      "name": "Developer Environments (Notebooks/IDE/Terminals)",
+      "status": "done",
+      "depends_on": ["M5", "M3"],
+      "objective": "Managed dev environments with audited remote access, TTL, templates, and dev->commit->run path.",
+      "exit_criteria": [
+        "Dev env controller in DP; per-project isolation; TTL and quotas enforced",
+        "Remote terminal/IDE access mediated and audited",
+        "Template selection policy-controlled; transition path to production-run"
+      ],
+      "epics": ["E12"]
+    },
+
+    {
+      "id": "M8",
+      "name": "Model Registry & Promotion Workflow",
+      "status": "done",
+      "depends_on": ["M5", "M3"],
+      "objective": "Model lifecycle with validation/approval, export hooks, policy control, lineage integration.",
+      "exit_criteria": [
+        "Model/ModelVersion CRUD with statuses; transitions enforced and audited",
+        "Promotion gated by RBAC; export interface and policies enforced",
+        "Model lineage queryable (from runs/artifacts/datasets)"
+      ],
+      "epics": ["E13", "E11"]
+    },
+
+    {
+      "id": "M9",
+      "name": "Operability, HA/DR, Packaging, Supply Chain, E2E Acceptance & Release",
+      "status": "not_started",
+      "depends_on": ["M5", "M6", "M7", "M8"],
+      "objective": "Ship production-grade v1 with HA, observability, backups/DR drills, packaging, air-gapped/SBOM gates, automated acceptance.",
+      "exit_criteria": [
+        "CP HA supported (stateless replicas + external DB); DP multi-cluster-ready",
+        "Metrics/logs/traces cover CP+DP critical paths with correlation IDs",
+        "Backup/restore validated; RPO/RTO measured; runbooks validated in game-days",
+        "Helm/Kustomize: install/upgrade/rollback tested across versions",
+        "Air-gapped bundle + integrity verification (if required)",
+        "SBOM generation + vuln scanning gating in CI",
+        "Automated E2E acceptance: git->run->artifacts->promotion + reproducibility checks"
+      ],
+      "epics": ["E14", "E15", "E09", "E16", "E17"]
+    }
+  ],
+
+  "epics": [
+    {
+      "id": "E00",
+      "name": "Repo, Tooling, CI Baseline",
+      "owner": "Platform Engineering",
+      "milestones": ["M0", "M9"],
+      "status": "in_progress",
+      "definition_of_done": [
+        "CI gates merges with lint/unit/integration policies",
+        "Security scanning baseline present; critical gates configurable",
+        "Contract-first specs linted and versioned"
+      ],
+      "tasks": [
+        {
+          "id": "T0001",
+          "title": "Define repository layout and module boundaries",
+          "type": "design",
+          "status": "done",
+          "deps": [],
+          "acceptance": ["Directory structure documented", "Ownership boundaries defined", "CP/DP boundary guardrails enforceable"]
+        },
+        {
+          "id": "T0002",
+          "title": "CI pipelines: lint, unit tests, formatting, PR gating",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0001"],
+          "acceptance": ["CI runs on PR", "Failing checks block merge", "Artifacts (reports) published per run"]
+        },
+        {
+          "id": "T0003",
+          "title": "Security scanning baseline: SAST + dependency scan",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0002"],
+          "acceptance": ["Scans run in CI", "Critical findings gate releases (policy-controlled)"]
+        },
+        {
+          "id": "T0004",
+          "title": "Spec/contract linting in CI (OpenAPI/protos + backward-compat checks)",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0002"],
+          "acceptance": ["Schema lint on PR", "Breaking changes require major bump", "Changelog generated"]
+        }
+      ]
+    },
+
+    {
+      "id": "E01",
+      "name": "Architecture Baseline & Contracts",
+      "owner": "Architecture",
+      "milestones": ["M0", "M2", "M3"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0101",
+          "title": "Freeze CP/DP service list, trust boundaries, and responsibilities",
+          "type": "design",
+          "status": "done",
+          "deps": ["T0001"],
+          "acceptance": ["Service responsibility doc exists", "Trust boundaries identified", "CP invariant validated by tooling"]
+        },
+        {
+          "id": "T0102",
+          "title": "Choose contract format and versioning scheme (OpenAPI/gRPC + SemVer)",
+          "type": "design",
+          "status": "done",
+          "deps": ["T0101"],
+          "acceptance": ["Versioning policy drafted", "Schema linting in CI"]
+        },
+        {
+          "id": "T0103",
+          "title": "Define error model + idempotency model",
+          "type": "design",
+          "status": "in_progress",
+          "deps": ["T0102"],
+          "acceptance": ["Error codes cataloged", "Idempotency key rules documented", "Retryable semantics defined"]
+        },
+        {
+          "id": "T0104",
+          "title": "Define CP<->DP execution protocol contract (messages + retries + idempotency)",
+          "type": "design",
+          "status": "not_started",
+          "deps": ["T0103"],
+          "acceptance": ["Protocol spec published", "Idempotency + replay behavior defined", "Security properties documented"]
+        }
+      ]
+    },
+
+    {
+      "id": "E02",
+      "name": "Metadata Store & Domain Persistence",
+      "owner": "Control Plane",
+      "milestones": ["M1", "M2", "M5"],
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T0201",
+          "title": "Migrations framework and external DB support",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0101"],
+          "acceptance": ["Migrations apply/rollback in CI", "External Postgres supported", "Schema drift detection exists"]
+        },
+        {
+          "id": "T0202",
+          "title": "Project CRUD + archive semantics",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0201"],
+          "acceptance": ["Project isolation enforced", "Archive -> read-only semantics", "Archive audited"]
+        },
+        {
+          "id": "T0203",
+          "title": "Dataset + DatasetVersion immutability",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0201"],
+          "acceptance": ["DatasetVersion immutable", "Schema/lineage refs stored", "Stats refs stored (optional initially)"]
+        },
+        {
+          "id": "T0204",
+          "title": "Introduce CodeRef entity and production-run constraints",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0103", "T0201"],
+          "acceptance": ["commit_sha required for production-run APIs", "repo_url validated", "CodeRef immutable per run"]
+        },
+        {
+          "id": "T0205",
+          "title": "EnvironmentDefinition + EnvironmentLock entities",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0201"],
+          "acceptance": ["EnvironmentLock immutable", "Image digest required", "SBOM ref stored (optional but recommended)"]
+        },
+        {
+          "id": "T0206",
+          "title": "PolicySnapshot entity stored with Run (RBAC, retention, network policy, template restrictions)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0201", "T0603"],
+          "acceptance": ["Every Run stores policy snapshot", "Snapshot hash included in reproducibility bundle"]
+        }
+      ]
+    },
+
+    {
+      "id": "E03",
+      "name": "Core Control Plane API",
+      "owner": "Control Plane",
+      "milestones": ["M1", "M2", "M4", "M5", "M6", "M8"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0301",
+          "title": "API gateway/service skeleton with auth middleware, request IDs, structured logging",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0102"],
+          "acceptance": ["Auth middleware integrated", "Request IDs propagated", "Logs structured and correlated"]
+        },
+        {
+          "id": "T0302",
+          "title": "CRUD endpoints for core resources (Projects/Datasets/DatasetVersions/Artifacts/Runs/Models/Environments)",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0301", "T0202", "T0203"],
+          "acceptance": ["Pagination/filtering", "Project scoping enforced", "RBAC hooks present", "Audit hooks present"]
+        },
+        {
+          "id": "T0303",
+          "title": "Idempotent create operations (Idempotency-Key persisted)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0302", "T0103"],
+          "acceptance": ["Duplicate creates return same resource", "Idempotency persisted and bounded by retention window"]
+        },
+        {
+          "id": "T0304",
+          "title": "Reproducibility bundle endpoint (export run inputs: DatasetVersion + CodeRef + EnvLock + params + policy snapshot)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0204", "T0205", "T0206", "T1101"],
+          "acceptance": ["Single API returns reproducibility bundle", "Bundle hash stable", "Access audited and RBAC enforced"]
+        }
+      ]
+    },
+
+    {
+      "id": "E04-Design",
+      "name": "Execution Contracts & Spec Validation",
+      "owner": "Architecture / Control Plane",
+      "milestones": ["M2", "M3"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0400",
+          "title": "PipelineSpec v1 schema freeze + validation rules (cycles, refs, digests)",
+          "type": "design",
+          "status": "done",
+          "deps": ["T0102", "T0103"],
+          "acceptance": ["Schema published", "Validator rejects cycles and invalid refs", "Bindings completeness rules defined"]
+        },
+        {
+          "id": "T0401",
+          "title": "RunSpec: enforce production-run requirements (DatasetVersionId+commit_sha+EnvLock)",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0400", "T0204", "T0205"],
+          "acceptance": ["Production-run endpoint rejects missing commit_sha/envLock/datasetVersion", "Validation errors deterministic"]
+        },
+        {
+          "id": "T0402",
+          "title": "Define execution dispatch contract CP->DP (RunExecutionRequest)",
+          "type": "design",
+          "status": "not_started",
+          "deps": ["T0104"],
+          "acceptance": ["Contract includes image digests, resources, network policy, secrets references", "Idempotency + retries specified"]
+        },
+        {
+          "id": "T0403",
+          "title": "Define DP->CP reporting contracts (heartbeat, terminal state, artifact commit)",
+          "type": "design",
+          "status": "not_started",
+          "deps": ["T0104"],
+          "acceptance": ["Terminal states exhaustive", "Safe duplicate semantics", "Correlation IDs defined"]
+        }
+      ]
+    },
+
+    {
+      "id": "E04",
+      "name": "Data Plane Executor (Kubernetes)",
+      "owner": "Data Plane",
+      "milestones": ["M3"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T0410",
+          "title": "DP executor service scaffold + K8s controller/client baseline",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0402", "T0403", "T0901"],
+          "acceptance": ["DP service deploys", "RBAC/service account least privilege", "Can create Jobs/Pods in scoped namespaces"]
+        },
+        {
+          "id": "T0411",
+          "title": "Run workload launcher (Job/Pod) with resource limits and isolation",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0410"],
+          "acceptance": ["CPU/mem limits enforced", "GPU optional", "Filesystem and service account hardened", "Network policies applied"]
+        },
+        {
+          "id": "T0412",
+          "title": "DP -> CP heartbeats and terminal state reporting",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0411"],
+          "acceptance": ["Heartbeat interval configurable", "Terminal states delivered reliably", "CP accepts duplicates idempotently"]
+        },
+        {
+          "id": "T0413",
+          "title": "Artifact write-through: upload artifacts with checksums + commit event",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0411", "T0701"],
+          "acceptance": ["Artifacts stored under per-project prefix", "Checksums persisted", "Commit event emitted"]
+        },
+        {
+          "id": "T0414",
+          "title": "Reconciliation loop for orphaned/unknown runs",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0412"],
+          "acceptance": ["Unknown runs reconciled to terminal or resumed", "No manual status edits", "Audited reconciliation decisions"]
+        },
+        {
+          "id": "T0415",
+          "title": "Run-scoped telemetry: logs and traces correlated by run_id",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T1402"],
+          "acceptance": ["Logs retrievable by run_id", "Traces include run_id and step_id", "No secrets in logs"]
+        }
+      ]
+    },
+
+    {
+      "id": "E05-Prep",
+      "name": "Run Lifecycle & State Machine (CP)",
+      "owner": "Control Plane",
+      "milestones": ["M2", "M4"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0500",
+          "title": "Run state machine formalization (queued/running/succeeded/failed/canceled/unknown) + derivation rules",
+          "type": "design",
+          "status": "done",
+          "deps": ["T0400"],
+          "acceptance": ["State derivation rules documented", "Transitions audited", "Terminal states immutable"]
+        },
+        {
+          "id": "T0501",
+          "title": "Execution plan persistence and hashing hardening",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0500"],
+          "acceptance": ["plan_hash stable", "Plan stored immutably", "Plan regeneration yields same result"]
+        },
+        {
+          "id": "T0502",
+          "title": "CP dispatch endpoint to DP (internal) + idempotency guarantees",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0402", "T0410"],
+          "acceptance": ["Dispatch idempotent", "Retryable failures handled", "Audit event emitted for dispatch"]
+        }
+      ]
+    },
+
+    {
+      "id": "E05",
+      "name": "Scheduling, Queues, Quotas, Retries, Cancellation",
+      "owner": "Control Plane",
+      "milestones": ["M4", "M6"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T0510",
+          "title": "Scheduler service: queues + priorities + quotas per project",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0502", "T0202"],
+          "acceptance": ["Fair dispatch", "Quota exceed returns QUOTA_EXCEEDED", "Decisions auditable"]
+        },
+        {
+          "id": "T0511",
+          "title": "Retry/backoff policies for runs (platform vs user errors)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0510"],
+          "acceptance": ["Policy configurable", "Retries create linked runs", "No runaway retries"]
+        },
+        {
+          "id": "T0512",
+          "title": "Cancellation semantics end-to-end (CP->DP) + artifact retention rules",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0510", "T0412"],
+          "acceptance": ["Cancel propagates", "Audit recorded", "Artifacts retained per policy snapshot"]
+        },
+        {
+          "id": "T0513",
+          "title": "Backpressure and rate limits (API + scheduler) per project",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0510", "T0603"],
+          "acceptance": ["Rate limits enforced", "Errors retryable where safe", "Metrics exported"]
+        }
+      ]
+    },
+
+    {
+      "id": "E06",
+      "name": "Authentication & Authorization (SSO + RBAC)",
+      "owner": "Security/Identity",
+      "milestones": ["M5", "M9"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0601",
+          "title": "OIDC authentication with session TTL and forced logout",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0301"],
+          "acceptance": ["OIDC login works", "Session TTL enforced", "Forced logout supported", "Auth events audited"]
+        },
+        {
+          "id": "T0602",
+          "title": "SAML option behind same auth abstraction (if required)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0601"],
+          "acceptance": ["SAML login works", "No behavioral drift vs OIDC", "Audited"]
+        },
+        {
+          "id": "T0603",
+          "title": "RBAC roles + project role bindings (IdP groups -> roles)",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0302", "T0601"],
+          "acceptance": ["RBAC matrix enforced on endpoints", "Role changes audited", "Deny-by-default"]
+        },
+        {
+          "id": "T0604",
+          "title": "Object-level authorization hooks (Dataset/Run/Model) for read/download/export",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0603"],
+          "acceptance": ["Checks applied", "No bypass paths", "Audit recorded for protected access"]
+        }
+      ]
+    },
+
+    {
+      "id": "E07",
+      "name": "Artifacts & Object Storage",
+      "owner": "Data/Platform",
+      "milestones": ["M1", "M3", "M5"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T0701",
+          "title": "S3-compatible artifact storage integration (write-through from DP)",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0413"],
+          "acceptance": ["Artifacts uploaded with checksum", "Per-project prefix separation", "Retention metadata stored"]
+        },
+        {
+          "id": "T0702",
+          "title": "Artifact access mediation via CP (signed URLs/proxy) with audit and RBAC",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0604"],
+          "acceptance": ["Downloads audited", "RBAC enforced", "No secrets leaked"]
+        },
+        {
+          "id": "T0703",
+          "title": "Retention policies + secure deletion hooks + legal hold enforcement",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0701", "T1103"],
+          "acceptance": ["Retention schedules apply", "Legal hold blocks deletion", "Deletion audited"]
+        }
+      ]
+    },
+
+    {
+      "id": "E08",
+      "name": "Pipelines (DAG) & PipelineRun",
+      "owner": "Control Plane",
+      "milestones": ["M2", "M6"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T0801",
+          "title": "PipelineRun creation: materialize node-runs + dependency graph",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0400", "T0510"],
+          "acceptance": ["Node-runs created with correct deps", "Statuses tracked", "Audit events emitted"]
+        },
+        {
+          "id": "T0802",
+          "title": "DAG execution engine: dispatch nodes to DP with retries/backoff",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0801", "T0511", "T0502"],
+          "acceptance": ["Retries per node", "Partial failure semantics", "Idempotent dispatching"]
+        },
+        {
+          "id": "T0803",
+          "title": "Graph query API (pipeline graph view) + pagination/filtering",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0801"],
+          "acceptance": ["API returns DAG nodes/edges + statuses", "Supports time range and state filtering"]
+        }
+      ]
+    },
+
+    {
+      "id": "E09",
+      "name": "Packaging & Deployment Baseline",
+      "owner": "Platform Engineering",
+      "milestones": ["M0", "M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T0901",
+          "title": "Helm charts for CP/DP components with external DB/object storage support",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0101", "T0201"],
+          "acceptance": ["Install works on clean cluster", "Values documented", "External DB supported", "Secure defaults"]
+        },
+        {
+          "id": "T0902",
+          "title": "Config schema and validation for Helm values",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0901"],
+          "acceptance": ["Invalid configs fail fast", "Defaults secure-by-default", "Examples per environment profile"]
+        },
+        {
+          "id": "T0903",
+          "title": "Upgrade/rollback tests across versions (compat policy enforced)",
+          "type": "validation",
+          "status": "not_started",
+          "deps": ["T0901", "T0004"],
+          "acceptance": ["Upgrade succeeds", "Rollback succeeds", "DB migrations compatible per policy"]
+        }
+      ]
+    },
+
+    {
+      "id": "E10",
+      "name": "Secrets Management (Vault-like)",
+      "owner": "Security/Platform",
+      "milestones": ["M5", "M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1001",
+          "title": "Integrate secrets manager for ephemeral credentials (execution-time only)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0411", "T0601"],
+          "acceptance": ["Secrets retrieved only at execution time", "TTL enforced", "Rotation supported", "Access audited (metadata only)"]
+        },
+        {
+          "id": "T1002",
+          "title": "Secret redaction pipeline for logs/artifacts",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T1001", "T0415"],
+          "acceptance": ["Known patterns redacted", "No secret values in UI/API", "Regression tests exist"]
+        }
+      ]
+    },
+
+    {
+      "id": "E11",
+      "name": "Audit & Governance (Append-only + Export)",
+      "owner": "Security/Control Plane",
+      "milestones": ["M1", "M5", "M9"],
+      "status": "in_progress",
+      "tasks": [
+        {
+          "id": "T1101",
+          "title": "AuditEvent store + mandatory emission hooks coverage",
+          "type": "implementation",
+          "status": "in_progress",
+          "deps": ["T0302"],
+          "acceptance": [
+            "All state-changing operations emit events",
+            "Events immutable/append-only",
+            "Coverage report exists (endpoint->event mapping)",
+            "Bypass paths eliminated"
+          ]
+        },
+        {
+          "id": "T1102",
+          "title": "Audit export to SIEM (webhook/syslog) with retries + idempotency",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T1101"],
+          "acceptance": [
+            "Export survives receiver downtime",
+            "Retry/backoff and buffering documented",
+            "Safe duplicate behavior",
+            "Per-project filters supported"
+          ]
+        },
+        {
+          "id": "T1103",
+          "title": "Governance hooks: retention + legal hold enforcement",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0703", "T1101"],
+          "acceptance": ["Deletion blocked under legal hold", "Retention policies applied on schedule", "Actions audited"]
+        },
+        {
+          "id": "T1104",
+          "title": "Audit completeness tests (non-disableable audit regression suite)",
+          "type": "validation",
+          "status": "not_started",
+          "deps": ["T1101", "T1702"],
+          "acceptance": ["CI regression tests prove audit cannot be disabled", "Sampling verifies exports match store"]
+        }
+      ]
+    },
+
+    {
+      "id": "E12",
+      "name": "Managed Developer Environments",
+      "owner": "Data Plane / DX",
+      "milestones": ["M7", "M9"],
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1201",
+          "title": "Dev environment controller (create/stop/ttl/quota) in DP",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0603", "T0410"],
+          "acceptance": ["Dev env created per project", "TTL enforced", "Quota enforced", "Network policies applied"]
+        },
+        {
+          "id": "T1202",
+          "title": "Remote access endpoints (terminal + IDE proxy) with auth and audit",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T1201", "T1101"],
+          "acceptance": ["Access requires auth", "Sessions audited", "No secret exposure"]
+        },
+        {
+          "id": "T1203",
+          "title": "Environment templates (CPU/GPU) versioned + policy-controlled selection",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0205", "T1201", "T0206"],
+          "acceptance": ["Templates versioned", "Policies restrict templates per project", "Template snapshot stored"]
+        }
+      ]
+    },
+
+    {
+      "id": "E13",
+      "name": "Model Registry & Promotion",
+      "owner": "Control Plane / ML Platform",
+      "milestones": ["M8", "M9"],
+      "status": "done",
+      "tasks": [
+        {
+          "id": "T1301",
+          "title": "Model/ModelVersion entities + status transitions",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T0302", "T1101"],
+          "acceptance": ["Statuses enforced", "Transitions audited", "Project scoping enforced"]
+        },
+        {
+          "id": "T1302",
+          "title": "Validation/approval workflow with role enforcement",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T1301", "T0603"],
+          "acceptance": ["Only authorized roles can approve", "Approval emits events", "Policy snapshot stored"]
+        },
+        {
+          "id": "T1303",
+          "title": "Model export interface + policy controls + export audit/events",
+          "type": "implementation",
+          "status": "done",
+          "deps": ["T1302", "T0702"],
+          "acceptance": ["Export allowed/denied per policy", "Exports audited", "Event emitted and export retriable"]
+        }
+      ]
+    },
+
+    {
+      "id": "E14",
+      "name": "Observability (Metrics/Logs/Tracing)",
+      "owner": "SRE",
+      "milestones": ["M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1401",
+          "title": "Instrument CP with Prometheus metrics and OTel traces",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0301"],
+          "acceptance": ["Latency/error/throughput metrics", "Traces for critical paths", "Dashboards documented"]
+        },
+        {
+          "id": "T1402",
+          "title": "Instrument DP with metrics/logs/traces (run-scoped)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0410"],
+          "acceptance": ["Run lifecycle observable", "Resource usage metrics exported", "Correlation IDs propagate"]
+        },
+        {
+          "id": "T1403",
+          "title": "Standardize structured logging + correlation IDs across services",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T1401", "T1402"],
+          "acceptance": ["Logs JSON structured", "request_id/run_id/step_id propagated end-to-end"]
+        }
+      ]
+    },
+
+    {
+      "id": "E15",
+      "name": "Reliability, HA, Backup & DR",
+      "owner": "SRE/Platform",
+      "milestones": ["M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1501",
+          "title": "HA guidance and implementation for CP (stateless replicas + external DB)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0901", "T0201"],
+          "acceptance": ["CP remains available during pod failures", "Leader election safe if needed", "SLOs documented"]
+        },
+        {
+          "id": "T1502",
+          "title": "Backup/restore tooling + DR game-day",
+          "type": "validation",
+          "status": "not_started",
+          "deps": ["T1501"],
+          "acceptance": ["Restore validated", "RPO/RTO measured and documented", "Artifacts and metadata included"]
+        },
+        {
+          "id": "T1503",
+          "title": "Operational runbooks validated (game-days) + gap tracking",
+          "type": "validation",
+          "status": "not_started",
+          "deps": ["T1403", "T1502"],
+          "acceptance": ["Runbooks executed successfully", "Gaps tracked as issues", "On-call playbooks defined"]
+        }
+      ]
+    },
+
+    {
+      "id": "E16",
+      "name": "Air-Gapped Delivery + SBOM + Supply Chain",
+      "owner": "Security/Platform",
+      "milestones": ["M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1601",
+          "title": "Generate SBOM for all images and publish with releases",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0003"],
+          "acceptance": ["SBOM per build", "Stored and retrievable", "Referenced from EnvironmentLock where applicable"]
+        },
+        {
+          "id": "T1602",
+          "title": "Air-gapped bundle (images/charts/deps) + verification procedure",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0901", "T1601"],
+          "acceptance": ["Offline install succeeds", "Integrity verification documented", "Policy can require verified artifacts"]
+        },
+        {
+          "id": "T1603",
+          "title": "Image signature verification (optional but recommended)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T1601"],
+          "acceptance": ["Unsigned images blockable by policy", "Signatures validated in CI"]
+        }
+      ]
+    },
+
+    {
+      "id": "E17",
+      "name": "E2E QA, Acceptance, Release",
+      "owner": "QA/Platform",
+      "milestones": ["M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1701",
+          "title": "Integration tests: git->run->artifacts->model promotion",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0412", "T0413", "T1302"],
+          "acceptance": ["Tests run in CI", "Covers success/failure paths", "Produces reproducibility bundle for each run"]
+        },
+        {
+          "id": "T1702",
+          "title": "Security tests: authz regression, secret redaction, audit completeness",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0604", "T1002", "T1101"],
+          "acceptance": ["RBAC tests cover matrix", "No secret leaks", "Audit cannot be disabled"]
+        },
+        {
+          "id": "T1703",
+          "title": "Release checklist + go/no-go gates",
+          "type": "validation",
+          "status": "not_started",
+          "deps": ["T1503", "T1602", "T1701", "T1702", "T0903"],
+          "acceptance": ["All milestone exit criteria satisfied", "Docs published", "Versioning policy adhered to"]
+        }
+      ]
+    },
+
+    {
+      "id": "E18",
+      "name": "Network Policy, Egress Control, Zero-Trust Hardening",
+      "owner": "Security/SRE",
+      "milestones": ["M5", "M9"],
+      "status": "not_started",
+      "tasks": [
+        {
+          "id": "T1801",
+          "title": "Default-deny egress for DP workloads; allowlist model (per project/template)",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0411", "T0206"],
+          "acceptance": ["Egress blocked by default", "Explicit allowlists enforceable", "Policy snapshot stored with runs"]
+        },
+        {
+          "id": "T1802",
+          "title": "Namespace isolation strategy (per project) + K8s RBAC hardening",
+          "type": "implementation",
+          "status": "not_started",
+          "deps": ["T0410", "T0901"],
+          "acceptance": ["Isolation prevents cross-project access", "Service accounts least privilege", "Audited changes"]
+        }
+      ]
+    }
+  ],
+
+  "schemas": [
+    {
+      "id": "S001",
+      "name": "Project",
+      "invariants": ["project_id immutable", "archive => read-only semantics"],
+      "storage": "Postgres",
+      "status": "implemented"
+    },
+    {
+      "id": "S002",
+      "name": "Dataset/DatasetVersion",
+      "invariants": ["DatasetVersion immutable", "project scoped"],
+      "storage": "Postgres + ObjectStore (payload refs)",
+      "status": "implemented"
+    },
+    {
+      "id": "S003",
+      "name": "Artifact",
+      "invariants": ["immutable metadata", "project scoped", "retention fields", "legal hold hook"],
+      "storage": "Postgres + ObjectStore",
+      "status": "implemented"
+    },
+    {
+      "id": "S004",
+      "name": "Run/ExecutionPlan/StepExecution",
+      "invariants": ["run immutable inputs", "plans immutable", "step executions append-only"],
+      "storage": "Postgres",
+      "status": "implemented_partial"
+    },
+    {
+      "id": "S005",
+      "name": "AuditEvent",
+      "invariants": ["append-only", "immutable", "non-disableable emission"],
+      "storage": "Postgres + Export pipeline",
+      "status": "implemented_partial"
+    },
+    {
+      "id": "S006",
+      "name": "CodeRef",
+      "invariants": ["commit_sha required for production", "repo_url validated", "immutable per run"],
+      "storage": "Postgres",
+      "status": "planned"
+    },
+    {
+      "id": "S007",
+      "name": "EnvironmentDefinition/EnvironmentLock",
+      "invariants": ["lock immutable", "image digests pinned", "SBOM refs optional"],
+      "storage": "Postgres + Registry refs",
+      "status": "planned"
+    },
+    {
+      "id": "S008",
+      "name": "PolicySnapshot",
+      "invariants": ["stored per run", "immutable", "hash referenced in reproducibility bundle"],
+      "storage": "Postgres",
+      "status": "planned"
+    },
+    {
+      "id": "S009",
+      "name": "Model/ModelVersion",
+      "invariants": ["status transitions enforced", "promotion audited", "project scoped"],
+      "storage": "Postgres + ObjectStore refs",
+      "status": "planned"
+    }
+  ],
+
+  "event_contracts": [
+    {
+      "id": "EV001",
+      "name": "RunCreated",
+      "scope": "project",
+      "required_fields": ["project_id", "run_id", "run_spec_hash", "request_id", "actor"],
+      "status": "implemented_partial"
+    },
+    {
+      "id": "EV002",
+      "name": "RunValidated",
+      "scope": "project",
+      "required_fields": ["project_id", "run_id", "validation_result", "actor"],
+      "status": "implemented_partial"
+    },
+    {
+      "id": "EV003",
+      "name": "ExecutionPlanned",
+      "scope": "project",
+      "required_fields": ["project_id", "run_id", "plan_hash", "actor"],
+      "status": "implemented_partial"
+    },
+    {
+      "id": "EV004",
+      "name": "RunDispatched",
+      "scope": "project",
+      "required_fields": ["project_id", "run_id", "dp_target", "actor"],
+      "status": "planned"
+    },
+    {
+      "id": "EV005",
+      "name": "RunStateChanged",
+      "scope": "project",
+      "required_fields": ["project_id", "run_id", "from_state", "to_state", "reason", "actor_or_system"],
+      "status": "planned"
+    },
+    {
+      "id": "EV006",
+      "name": "ArtifactDownloaded",
+      "scope": "project",
+      "required_fields": ["project_id", "artifact_id", "actor", "request_id"],
+      "status": "implemented_partial"
+    },
+    {
+      "id": "EV007",
+      "name": "RoleBindingChanged",
+      "scope": "system+project",
+      "required_fields": ["project_id", "subject", "role", "actor"],
+      "status": "planned"
+    },
+    {
+      "id": "EV008",
+      "name": "AuditExportDelivered",
+      "scope": "system",
+      "required_fields": ["export_id", "destination", "attempt", "status", "timestamp"],
+      "status": "planned"
+    }
+  ],
+
+  "quality_gates": {
+    "ci": [
+      "lint",
+      "unit_tests",
+      "integration_tests",
+      "schema_lint",
+      "breaking_change_check",
+      "security_scans"
+    ],
+    "security": [
+      "rbac_regression_suite",
+      "secret_redaction_suite",
+      "audit_completeness_suite",
+      "supply_chain_gates (SBOM/vuln/signatures as policy)"
+    ],
+    "operability": [
+      "observability_smoke (metrics/logs/traces present)",
+      "ha_smoke (cp replicas, db failover assumptions documented)",
+      "backup_restore_drill"
+    ],
+    "acceptance": [
+      "e2e_git_to_run_to_artifacts_to_promotion",
+      "reproducibility_bundle_verification",
+      "no_hidden_state_graph_traceability"
+    ]
+  },
+
+  "traceability": {
+    "legacy_phase_mapping": {
+      "P0": "M0",
+      "P1": "M1",
+      "P2": "M2+M3+M4 (split: contracts/planning vs real execution vs scheduling)",
+      "P3": "M6+M8",
+      "P4": "M7",
+      "P5": "M5 + M9 (packaging/supply-chain subset)",
+      "P6": "M5",
+      "P7": "M9",
+      "P8": "M9"
+    }
+  }
+}

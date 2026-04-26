@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use Animus Datalab in research, engineering evaluation, or public documentation, please cite this repository."
+title: "Animus Datalab"
+type: software
+authors:
+  - family-names: "Sotnikov"
+    given-names: "Maksim"
+repository-code: "https://github.com/AnimusHQ/mllaboratory"
+url: "https://github.com/AnimusHQ/mllaboratory"
+license: "Apache-2.0"
+keywords:
+  - mlops
+  - machine-learning
+  - kubernetes
+  - reproducibility
+  - auditability
+  - openapi
+  - postgresql
+abstract: "Animus Datalab is an open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows."

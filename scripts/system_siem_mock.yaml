@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: siem-mock
+  labels:
+    app: siem-mock
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: siem-mock
+  template:
+    metadata:
+      labels:
+        app: siem-mock
+    spec:
+      containers:
+        - name: webhook
+          image: hashicorp/http-echo:1.0.0
+          args: ["-listen=:18080", "-text=ok"]
+          ports:
+            - name: webhook
+              containerPort: 18080
+              protocol: TCP
+        - name: syslog-tcp
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args: ["nc -lk -p 1514 >/dev/null"]
+          ports:
+            - name: syslog-tcp
+              containerPort: 1514
+              protocol: TCP
+        - name: syslog-udp
+          image: busybox:1.36
+          command: ["/bin/sh", "-c"]
+          args: ["nc -klu -p 1515 >/dev/null"]
+          ports:
+            - name: syslog-udp
+              containerPort: 1515
+              protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: siem-mock
+  labels:
+    app: siem-mock
+spec:
+  selector:
+    app: siem-mock
+  ports:
+    - name: webhook
+      port: 18080
+      targetPort: 18080
+      protocol: TCP
+    - name: syslog-tcp
+      port: 1514
+      targetPort: 1514
+      protocol: TCP
+    - name: syslog-udp
+      port: 1515
+      targetPort: 1515
+      protocol: UDP

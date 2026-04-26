@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: animus
+      POSTGRES_PASSWORD: animus
+      POSTGRES_DB: animus
+    ports:
+      - "55432:5432"
+  minio:
+    image: minio/minio:RELEASE.2024-11-07T00-00-00Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: animus
+      MINIO_ROOT_PASSWORD: animusminio
+    ports:
+      - "59000:9000"
+      - "59001:9001"

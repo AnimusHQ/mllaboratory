@@ -1,0 +1,11 @@
+.git
+.github
+.cache
+.next
+!/closed/**
+node_modules
+**/__pycache__
+**/*.pyc
+
+# Large local demo datasets (keep out of Docker build context)
+open/demo/data/car_plate_ocr

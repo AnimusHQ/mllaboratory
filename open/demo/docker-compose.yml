@@ -1,0 +1,190 @@
+services:
+  postgres:
+    image: postgres:14-alpine
+    container_name: animus-postgres
+    environment:
+      POSTGRES_USER: ${ANIMUS_POSTGRES_USER:-animus}
+      POSTGRES_PASSWORD: ${ANIMUS_POSTGRES_PASSWORD:-animus}
+      POSTGRES_DB: ${ANIMUS_POSTGRES_DB:-animus}
+    ports:
+      - "${ANIMUS_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - animus-demo-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e
+    container_name: animus-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${ANIMUS_MINIO_ROOT_USER:-animus-root}
+      MINIO_ROOT_PASSWORD: ${ANIMUS_MINIO_ROOT_PASSWORD:-animus-root-password}
+    ports:
+      - "${ANIMUS_MINIO_PORT:-9000}:9000"
+      - "${ANIMUS_MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - animus-demo-minio:/data
+
+  minio-init:
+    image: minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727
+    depends_on:
+      minio:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        if (set -o pipefail) >/dev/null 2>&1; then set -o pipefail; fi
+
+        alias_ok=0
+        for i in $$(seq 1 60); do
+          if mc alias set animus http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; then
+            alias_ok=1
+            break
+          fi
+          sleep 1
+        done
+        if [ "$$alias_ok" != "1" ]; then
+          echo "minio-init: failed to connect to minio (alias set failed)" >&2
+          exit 1
+        fi
+
+        mc mb -p animus/datasets || true
+        mc mb -p animus/artifacts || true
+
+        cat > /tmp/animus-rw.json <<'POLICY'
+        {"Version":"2012-10-17","Statement":[{"Effect":"Allow","Action":["s3:GetBucketLocation","s3:ListBucket"],"Resource":["arn:aws:s3:::datasets","arn:aws:s3:::artifacts"]},{"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:DeleteObject"],"Resource":["arn:aws:s3:::datasets/*","arn:aws:s3:::artifacts/*"]}]}
+        POLICY
+
+        mc admin user rm animus "$${ANIMUS_MINIO_ACCESS_KEY}" >/dev/null 2>&1 || true
+        mc admin user add animus "$${ANIMUS_MINIO_ACCESS_KEY}" "$${ANIMUS_MINIO_SECRET_KEY}"
+        mc admin policy create animus animus-rw /tmp/animus-rw.json >/dev/null 2>&1 || mc admin policy info animus animus-rw >/dev/null 2>&1
+        mc admin policy attach animus animus-rw --user "$${ANIMUS_MINIO_ACCESS_KEY}"
+
+        echo "minio buckets ensured"
+    environment:
+      MINIO_ROOT_USER: ${ANIMUS_MINIO_ROOT_USER:-animus-root}
+      MINIO_ROOT_PASSWORD: ${ANIMUS_MINIO_ROOT_PASSWORD:-animus-root-password}
+      ANIMUS_MINIO_ACCESS_KEY: ${ANIMUS_MINIO_ACCESS_KEY:-animus}
+      ANIMUS_MINIO_SECRET_KEY: ${ANIMUS_MINIO_SECRET_KEY:-animusminio}
+
+  gateway:
+    image: golang:1.22
+    working_dir: /workspace
+    command: ["go", "run", "./closed/gateway"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      dataset-registry:
+        condition: service_started
+      experiments:
+        condition: service_started
+      audit:
+        condition: service_started
+    environment:
+      GATEWAY_HTTP_ADDR: 0.0.0.0:8080
+      DATABASE_URL: ${DATABASE_URL:-postgres://animus:animus@postgres:5432/animus?sslmode=disable}
+      AUTH_MODE: ${AUTH_MODE:-dev}
+      AUTH_SESSION_COOKIE_SECURE: ${AUTH_SESSION_COOKIE_SECURE:-false}
+      ANIMUS_INTERNAL_AUTH_SECRET: ${ANIMUS_INTERNAL_AUTH_SECRET:-animus-demo-internal-secret}
+      DATASET_REGISTRY_BASE_URL: http://dataset-registry:8081
+      QUALITY_BASE_URL: http://quality:8082
+      EXPERIMENTS_BASE_URL: http://experiments:8083
+      LINEAGE_BASE_URL: http://lineage:8084
+      AUDIT_BASE_URL: http://audit:8085
+    ports:
+      - "${ANIMUS_GATEWAY_PORT:-8080}:8080"
+    volumes:
+      - ../..:/workspace
+      - animus-demo-go-mod:/go/pkg/mod
+      - animus-demo-go-build:/root/.cache/go-build
+
+  dataset-registry:
+    image: golang:1.22
+    working_dir: /workspace
+    command: ["go", "run", "./closed/dataset-registry"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      DATASET_REGISTRY_HTTP_ADDR: 0.0.0.0:8081
+      DATABASE_URL: ${DATABASE_URL:-postgres://animus:animus@postgres:5432/animus?sslmode=disable}
+      ANIMUS_INTERNAL_AUTH_SECRET: ${ANIMUS_INTERNAL_AUTH_SECRET:-animus-demo-internal-secret}
+      ANIMUS_MINIO_ENDPOINT: ${ANIMUS_MINIO_ENDPOINT:-minio:9000}
+      ANIMUS_MINIO_ACCESS_KEY: ${ANIMUS_MINIO_ACCESS_KEY:-animus}
+      ANIMUS_MINIO_SECRET_KEY: ${ANIMUS_MINIO_SECRET_KEY:-animusminio}
+      ANIMUS_MINIO_USE_SSL: ${ANIMUS_MINIO_USE_SSL:-false}
+      ANIMUS_MINIO_BUCKET_DATASETS: ${ANIMUS_MINIO_BUCKET_DATASETS:-datasets}
+      ANIMUS_MINIO_BUCKET_ARTIFACTS: ${ANIMUS_MINIO_BUCKET_ARTIFACTS:-artifacts}
+    volumes:
+      - ../..:/workspace
+      - animus-demo-go-mod:/go/pkg/mod
+      - animus-demo-go-build:/root/.cache/go-build
+
+  experiments:
+    image: golang:1.22
+    working_dir: /workspace
+    command: ["go", "run", "./closed/experiments"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      EXPERIMENTS_HTTP_ADDR: 0.0.0.0:8083
+      DATABASE_URL: ${DATABASE_URL:-postgres://animus:animus@postgres:5432/animus?sslmode=disable}
+      ANIMUS_INTERNAL_AUTH_SECRET: ${ANIMUS_INTERNAL_AUTH_SECRET:-animus-demo-internal-secret}
+      ANIMUS_CI_WEBHOOK_SECRET: ${ANIMUS_CI_WEBHOOK_SECRET:-animus-ci-webhook-dev-secret-change-me}
+      ANIMUS_MINIO_ENDPOINT: ${ANIMUS_MINIO_ENDPOINT:-minio:9000}
+      ANIMUS_MINIO_ACCESS_KEY: ${ANIMUS_MINIO_ACCESS_KEY:-animus}
+      ANIMUS_MINIO_SECRET_KEY: ${ANIMUS_MINIO_SECRET_KEY:-animusminio}
+      ANIMUS_MINIO_USE_SSL: ${ANIMUS_MINIO_USE_SSL:-false}
+      ANIMUS_MINIO_BUCKET_DATASETS: ${ANIMUS_MINIO_BUCKET_DATASETS:-datasets}
+      ANIMUS_MINIO_BUCKET_ARTIFACTS: ${ANIMUS_MINIO_BUCKET_ARTIFACTS:-artifacts}
+    volumes:
+      - ../..:/workspace
+      - animus-demo-go-mod:/go/pkg/mod
+      - animus-demo-go-build:/root/.cache/go-build
+
+  audit:
+    image: golang:1.22
+    working_dir: /workspace
+    command: ["go", "run", "./closed/audit"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AUDIT_HTTP_ADDR: 0.0.0.0:8085
+      DATABASE_URL: ${DATABASE_URL:-postgres://animus:animus@postgres:5432/animus?sslmode=disable}
+      ANIMUS_INTERNAL_AUTH_SECRET: ${ANIMUS_INTERNAL_AUTH_SECRET:-animus-demo-internal-secret}
+    volumes:
+      - ../..:/workspace
+      - animus-demo-go-mod:/go/pkg/mod
+      - animus-demo-go-build:/root/.cache/go-build
+
+  userspace-runner:
+    build:
+      context: ../..
+      dockerfile: open/demo/userspace/Dockerfile
+    environment:
+      USERSPACE_HTTP_ADDR: 0.0.0.0:8090
+      DEMO_OUTPUT_DIR: /outputs
+    ports:
+      - "${ANIMUS_USERSPACE_PORT:-8090}:8090"
+    volumes:
+      - animus-demo-userspace:/outputs
+
+volumes:
+  animus-demo-postgres:
+  animus-demo-minio:
+  animus-demo-go-mod:
+  animus-demo-go-build:
+  animus-demo-userspace:

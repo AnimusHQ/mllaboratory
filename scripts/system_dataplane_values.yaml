@@ -1,0 +1,6 @@
+secrets:
+  provider: noop
+
+runtime:
+  heartbeatInterval: 10s
+  statusPollInterval: 1h

@@ -1,0 +1,823 @@
+openapi: 3.0.3
+info:
+  title: Animus Dataplane Internal API
+  version: v1
+  description: |
+    Внутренний протокол Control Plane ↔ Data Plane.
+    Контракт предназначен только для сервис‑к‑сервису взаимодействия и не доступен внешним клиентам.
+servers:
+  - url: http://dataplane.internal
+    description: DP service (requests from CP)
+  - url: http://controlplane.internal
+    description: CP internal endpoints (requests from DP)
+tags:
+  - name: dataplane
+    description: Endpoints, обслуживаемые Data Plane.
+  - name: control-plane
+    description: Endpoints, обслуживаемые Control Plane для входящих DP событий.
+
+paths:
+  /internal/dp/runs/{run_id}:execute:
+    post:
+      tags: [dataplane]
+      summary: Запросить запуск выполнения Run в DP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunExecutionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunExecutionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/dp/runs/{run_id}/status:
+    get:
+      tags: [dataplane]
+      summary: Получить текущий статус выполнения Run в DP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: project_id
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunExecutionStatus"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/dp/dev-envs/{dev_env_id}:create:
+    post:
+      tags: [dataplane]
+      summary: Создать DevEnvironment в DP
+      parameters:
+        - name: dev_env_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvProvisionRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvProvisionResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/dp/dev-envs/{dev_env_id}:delete:
+    post:
+      tags: [dataplane]
+      summary: Удалить DevEnvironment в DP
+      parameters:
+        - name: dev_env_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvDeleteRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvDeleteResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/dp/dev-envs/{dev_env_id}/access:
+    post:
+      tags: [dataplane]
+      summary: Получить доступ к DevEnvironment в DP
+      parameters:
+        - name: dev_env_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DevEnvAccessRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DevEnvAccessResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/cp/runs/{run_id}/heartbeat:
+    post:
+      tags: [control-plane]
+      summary: Передать heartbeat выполнения Run от DP в CP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunHeartbeat"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunHeartbeatResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/cp/runs/{run_id}/terminal:
+    post:
+      tags: [control-plane]
+      summary: Передать терминальное состояние выполнения Run от DP в CP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RunTerminalState"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RunTerminalResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/cp/runs/{run_id}/artifact-committed:
+    post:
+      tags: [control-plane]
+      summary: Передать событие фиксации артефактов от DP в CP (M3 заглушка)
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ArtifactCommitted"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactCommittedResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /internal/cp/runs/{run_id}/secrets-accessed:
+    post:
+      tags: [control-plane]
+      summary: Передать событие доступа к секретам выполнения Run от DP в CP
+      parameters:
+        - name: run_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SecretAccessed"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SecretAccessedResponse"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [error, request_id]
+      properties:
+        error:
+          type: string
+        request_id:
+          type: string
+    RunExecutionRequest:
+      type: object
+      additionalProperties: false
+      required: [runId, projectId, dispatchId, emittedAt]
+      properties:
+        runId:
+          type: string
+        projectId:
+          type: string
+        dispatchId:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+        correlationId:
+          type: string
+    RunExecutionResponse:
+      type: object
+      additionalProperties: false
+      required: [runId, projectId, dispatchId, accepted]
+      properties:
+        runId:
+          type: string
+        projectId:
+          type: string
+        dispatchId:
+          type: string
+        accepted:
+          type: boolean
+        jobName:
+          type: string
+        namespace:
+          type: string
+        message:
+          type: string
+    RunExecutionStatus:
+      type: object
+      additionalProperties: false
+      required: [runId, projectId, state]
+      properties:
+        runId:
+          type: string
+        projectId:
+          type: string
+        state:
+          type: string
+        jobName:
+          type: string
+        namespace:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    EnvironmentResources:
+      type: object
+      additionalProperties: false
+      properties:
+        cpu:
+          type: string
+        memory:
+          type: string
+        gpu:
+          type: integer
+    DevEnvProvisionRequest:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, templateRef, imageRef, ttlSeconds, emittedAt]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        templateRef:
+          type: string
+        templateVersion:
+          type: integer
+        templateIntegritySha256:
+          type: string
+        imageName:
+          type: string
+        imageRef:
+          type: string
+        resourceDefaults:
+          $ref: "#/components/schemas/EnvironmentResources"
+        resourceLimits:
+          $ref: "#/components/schemas/EnvironmentResources"
+        networkClassRef:
+          type: string
+        secretAccessClassRef:
+          type: string
+        ttlSeconds:
+          type: integer
+        emittedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+        correlationId:
+          type: string
+    DevEnvProvisionResponse:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, accepted]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        accepted:
+          type: boolean
+        jobName:
+          type: string
+        namespace:
+          type: string
+        message:
+          type: string
+    DevEnvAccessRequest:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, sessionId, emittedAt]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        sessionId:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+    DevEnvAccessResponse:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, ready]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        ready:
+          type: boolean
+        jobName:
+          type: string
+        namespace:
+          type: string
+        message:
+          type: string
+    DevEnvDeleteRequest:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, emittedAt]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        requestedBy:
+          type: string
+        correlationId:
+          type: string
+    DevEnvDeleteResponse:
+      type: object
+      additionalProperties: false
+      required: [devEnvId, projectId, deleted]
+      properties:
+        devEnvId:
+          type: string
+        projectId:
+          type: string
+        deleted:
+          type: boolean
+        message:
+          type: string
+    RunHeartbeat:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, projectId, emittedAt]
+      properties:
+        eventId:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    RunHeartbeatResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, duplicate]
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+    RunTerminalState:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, projectId, state, emittedAt]
+      properties:
+        eventId:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        state:
+          type: string
+          enum: [succeeded, failed, canceled]
+        emittedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        exitCode:
+          type: integer
+        correlationId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    RunTerminalResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, duplicate]
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+    ArtifactCommitted:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, projectId, emittedAt]
+      properties:
+        eventId:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    ArtifactCommittedResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, duplicate]
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean
+    SecretAccessed:
+      type: object
+      additionalProperties: false
+      required: [eventId, runId, projectId, emittedAt]
+      properties:
+        eventId:
+          type: string
+        runId:
+          type: string
+        projectId:
+          type: string
+        classRef:
+          type: string
+        leaseId:
+          type: string
+        subject:
+          type: string
+        emittedAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+        details:
+          type: object
+          additionalProperties: true
+    SecretAccessedResponse:
+      type: object
+      additionalProperties: false
+      required: [accepted, duplicate]
+      properties:
+        accepted:
+          type: boolean
+        duplicate:
+          type: boolean

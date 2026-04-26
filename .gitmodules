@@ -1,0 +1,7 @@
+[submodule "enterprise"]
+	path = enterprise
+	url = TODO_ENTERPRISE_REPO_URL
+
+[submodule "sdk"]
+	path = sdk
+	url = TODO_SDK_REPO_URL
