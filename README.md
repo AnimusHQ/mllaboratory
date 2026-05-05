@@ -1,4 +1,4 @@
-![Animus Datalab](docs/assets/mllab-banner.png)
+![Animus Datalab](docs/assets/banner.png)
 
 > **Open-core enterprise ML laboratory for reproducible, auditable, Kubernetes-backed machine learning workflows.** Animus Datalab organizes the full ML development lifecycle in a managed, reproducible form within a single operational context with common execution, security, and audit rules.
 
